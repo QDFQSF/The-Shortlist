@@ -7,6 +7,7 @@ from functools import lru_cache
 
 # --- 1. CONFIGURATION ---
 AMAZON_PARTNER_ID = "theshorlistap-21"
+INSTANT_GAMING_ID = "theshortlistapp"
 SUPABASE_URL = "https://enkgnmxqvnpvqceueayg.supabase.co"
 SUPABASE_KEY = "sb_secret_mNz02Qr2x9SnGMqIPtxRaw_GUK0f9Hd"
 TMDB_API_KEY = "53f9c070d843a78f4f16579e57bdda32" 
@@ -17,7 +18,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 try:
     api_key = st.secrets["AIzaSyCUnAP7WRxlklkE0ExCmGv4apHGeaIiEwc"]
 except:
-    api_key = "AIzaSyCTc5bi9aMFwucdHsMd1P-r6T1oS_mUJu4" # Uniquement pour tes tests locaux
+    api_key = "" # Uniquement pour tes tests locaux
 
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel(model_name="gemini-3-flash-preview") # Version stable et rapide
@@ -138,15 +139,20 @@ def get_all_images_parallel(titles, mode):
         return list(executor.map(lambda t: fetch_image_hd(t, mode), titles))
 
 def get_smart_link(title, mode):
-    """Génère un lien d'affiliation Amazon pour les produits physiques [cite: 2026-01-04]"""
-    query = urllib.parse.quote(title)
-    tag = "theshorlistap-21"
-    if mode in ["📚 Livres", "🎋 Mangas", "🎮 Jeux Vidéo", "🎬 Films"]:
-        # Lien de recherche Amazon France avec ton tag partenaire [cite: 2026-01-04]
-        return f"https://www.amazon.fr/s?k={query}&tag={AMAZON_PARTNER_ID}"
-    else:
-        # Fallback Google pour les autres catégories (ou séries en streaming)
-        return f"https://www.google.com/search?q={query}"
+    """Lien d'affiliation Instant Gaming corrigé avec le slash obligatoire"""
+    # quote_plus transforme les espaces en '+' pour le moteur de recherche
+    query = urllib.parse.quote_plus(title)
+    
+    # 🎮 JEUX VIDÉO : Note bien le "/" AVANT le "?" c'est lui qui évite le 404
+    if mode == "🎮 Jeux Vidéo":
+        return f"https://www.instant-gaming.com/fr/recherche/?q={query}&igr=theshortlistapp"
+    
+    # Reste du code Amazon (qui est déjà bon selon tes tests)
+    query_amazon = urllib.parse.quote(title)
+    if mode in ["📚 Livres", "🎋 Mangas", "🎬 Films", "📺 Séries"]:
+        return f"https://www.amazon.fr/s?k={query_amazon}&tag=theshorlistap-21"
+    
+    return f"https://www.google.com/search?q={query_amazon}"
 
 # --- 4. DESIGN (STYLE LP WEB DESIGN) ---
 st.markdown("""
@@ -213,11 +219,34 @@ with st.sidebar:
         **Contact :** theshortlistapp@proton.me
         """)
     
+    # --- BLOC MONÉTISATION (BOUNTIES AMAZON) ---
+    st.write("---")
+    st.subheader("🎁 Offres du moment")
+    
+    if app_mode in ["📚 Livres", "🎋 Mangas"]:
+        st.info("📖 **Lecture Illimitée**")
+        st.markdown(f"[Essai gratuit Kindle Unlimited](https://www.amazon.fr/kindle-dbs/hz/signup?tag={AMAZON_PARTNER_ID})") #
+        st.info("🎧 **Livres Audio**")
+        st.markdown(f"[1er Livre Audio gratuit sur Audible](https://www.amazon.fr/hz/audible/mlp?tag={AMAZON_PARTNER_ID})") #
+        
+    elif app_mode in ["🎬 Films", "📺 Séries"]:
+        st.info("🍿 **Streaming & Cinéma**")
+        st.markdown(f"[30 jours gratuits Prime Video](https://www.primevideo.com/?tag={AMAZON_PARTNER_ID})") #
+
     # RESTAURATION DU SÉLECTEUR DE PLATEFORME
     selected_platform = "Toutes plateformes"
     if app_mode == "🎮 Jeux Vidéo":
         selected_platform = st.selectbox("Plateforme", ["Toutes plateformes", "PC", "PS5", "Xbox", "Switch"])
     
+    # --- AJOUT DU SÉLECTEUR DE GENRE POUR LES LIVRES ---
+    selected_genre = "Général"
+    if app_mode == "📚 Livres":
+        selected_genre = st.selectbox("Style de lecture", [
+            "Général", "Dark Romance", "Thriller / Policier", 
+            "Fantasy / Science-Fiction", "Développement Personnel", 
+            "Histoire / Documentaire", "Classiques"
+        ])
+
     st.write("---")
     if not st.session_state.user_email:
         email = st.text_input("Email")
@@ -233,6 +262,18 @@ with st.sidebar:
         st.session_state.seen_items = [d['title'] for d in data]
         if st.button("Déconnexion"): st.session_state.user_email = None; st.rerun()
 
+# --- À AJOUTER DANS TA SIDEBAR (SECTION 5) ---
+st.sidebar.write("---")
+st.sidebar.subheader("☕ Soutenir le projet")
+st.sidebar.write("L'IA et les serveurs ont un coût. Si The Shortlist vous aide, n'hésitez pas !")
+st.sidebar.markdown("""
+    <a href="https://www.buymeacoffee.com/ton_pseudo" target="_blank">
+        <button style="width:100%; background-color:#FFDD00; color:black; border:none; border-radius:10px; padding:10px; font-weight:bold; cursor:pointer;">
+            💛 Offre-moi un café
+        </button>
+    </a>
+""", unsafe_allow_html=True)
+
 # --- 6. TABS ---
 media_label = app_mode.split(" ")[1]
 tab_search, tab_lib = st.tabs([f"🔎 Trouver un {media_label}", "📚 Ma Bibliothèque"])
@@ -243,7 +284,28 @@ with tab_search:
         <div class="logo-icon">3</div>
         <div class="logo-text">THE SHORTLIST</div>
     </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+    # --- NOUVEAU : FILTRES ACCESSIBLES AU CENTRE ---
+    c_filters = st.columns([1, 2, 1])
+    with c_filters[1]:
+        # Initialisation par défaut
+        selected_platform = "Toutes plateformes"
+        selected_genre = "Général"
+        
+        # Filtre dynamique selon le mode choisi [cite: 2026-01-04]
+        if app_mode == "🎮 Jeux Vidéo":
+            selected_platform = st.selectbox("🎮 Plateforme", ["Toutes plateformes", "PC", "PS5", "Xbox", "Switch"], label_visibility="collapsed")
+        elif app_mode == "📚 Livres":
+            selected_genre = st.selectbox("📖 Style de lecture", [
+                "Général", "Dark Romance", "Thriller / Policier", 
+                "Fantasy / Science-Fiction", "Développement Personnel", "Classiques"
+            ], label_visibility="collapsed")
+            # Petit rappel visuel du genre choisi pour ta femme !
+            if selected_genre == "Dark Romance":
+                st.caption("✨ Mode 'Dark Romance' activé pour des pépites passionnelles.")
+
+    # --- BARRE DE RECHERCHE ---
     c_search = st.columns([1, 4, 1])[1]
     with c_search:
         query = st.text_input("Recherche", placeholder=f"Ex: Un {media_label} épique...", label_visibility="collapsed")
@@ -281,10 +343,11 @@ with tab_search:
         
         # PROMPT ULTRA-RESTRICTIF POUR ÉVITER LE HORS-SUJET
         prompt = f"""
-        RÔLE : Tu es un bibliothécaire et curateur spécialisé en {app_mode}.
+        RÔLE : Tu es un bibliothécaire et curateur d'élite spécialisé en {app_mode}.
         RECHERCHE ACTUELLE : "{st.session_state.last_query}"
         FAVORIS DE L'UTILISATEUR : {favs}
         DÉJÀ VUS/LUS (À EXCLURE) : {exclude}
+        STYLE CIBLÉ : {selected_genre}
 
         RÈGLES D'OR ABSOLUES :
         1. SOUS-GENRE STRICT : Si la recherche ou les favoris indiquent un genre précis (ex: Dark Romance, Soulslike, Seinen), tu as INTERDICTION de proposer un autre genre. Un fan de Dark Romance ne veut pas de livres de mathématiques ou de fantaisie classique.
@@ -293,6 +356,11 @@ with tab_search:
         4. NOUVEAUTÉ : Priorise des pépites avec une ambiance identique mais d'auteurs/studios différents.
         5. PLATEFORME : {selected_platform}.
         6. EXCLUSIVITÉ : Propose 3 titres qui partagent la MÊME VIBE psychologique et thématique.
+        DIRECTIVES CRUCIALES :
+        7. AMBIGUÏTÉ DE GENRE : Si l'utilisateur cherche un thème comme "Mafia", "Boss", ou "Enemies to lovers" dans la catégorie Livres, privilégie TOUJOURS la FICTION (notamment la Dark Romance si le genre est sélectionné) plutôt que les documentaires historiques.
+        8. ANALYSE DE LA VIBE : Ne te contente pas des mots-clés. Si l'utilisateur cherche "Russian Mafia", il veut l'ambiance sombre, la tension et les codes de ce genre littéraire précis.
+        9. QUALITÉ LITTÉRAIRE : Propose des titres récents ou très populaires dans cette niche spécifique.
+        10. FORMAT : Réponds uniquement en JSON avec "titre" et "desc".
 
         RÉPONDS UNIQUEMENT AU FORMAT JSON SUIVANT :
         [
@@ -325,16 +393,19 @@ with tab_search:
 if st.session_state.current_recos:
     st.write("---")
     cols = st.columns(3)
+
+    # On récupère le contexte actuel pour le passer au remplacement
+    current_context = selected_platform if app_mode == "🎮 Jeux Vidéo" else selected_genre
+    
     for i, item in enumerate(st.session_state.current_recos):
         with cols[i]:
-            # 1. On génère les liens nécessaires [cite: 2026-01-04]
+            # 1. Génération des liens [cite: 2026-01-04]
             affiliate_link = get_smart_link(item['titre'], app_mode)
-            share_text = f"Regarde ce que The Shortlist m'a déniché : {item['titre']} ! Ça a l'air top : {affiliate_link}"
+            share_text = f"Regarde ce que The Shortlist m'a déniché : {item['titre']} ! {affiliate_link}"
             whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
-            
             img_url = item['img'] if item['img'] else "https://placehold.co/400x600"
             
-            # 2. Affichage de la Carte Visuelle [cite: 2026-01-06]
+            # 2. Affichage de la Carte [cite: 2026-01-06]
             st.markdown(f"""
                 <div class="game-card">
                     <div>
@@ -345,24 +416,71 @@ if st.session_state.current_recos:
                     <a href="{affiliate_link}" target="_blank" class="price-action">🛒 Voir le prix</a>
                 </div>
             """, unsafe_allow_html=True)
+            
+            # --- NOUVEAU : SYNOPSIS DÉROULANT ---
+            with st.expander("📖 Synopsis & Détails"):
+                # On peut ici afficher un texte récupéré de l'API ou demander à l'IA d'en générer un court
+                st.write(f"Découvrez l'univers de **{item['titre']}**. Un choix incontournable pour les amateurs du genre.")
+                # Lien "En savoir plus" dynamique
+                more_info_url = f"https://www.google.com/search?q={urllib.parse.quote(item['titre'] + ' synopsis')}"
+                st.markdown(f"[🔍 En savoir plus]({more_info_url})")
 
-            # 3. Bouton WhatsApp (Aligné dans la boucle) [cite: 2026-01-04]
+            # 4. LE BOUTON DE REJET (FIXÉ)
+            if st.button(f"❌ Pas pour moi", key=f"rej_{i}", use_container_width=True):
+                st.session_state.seen_items.append(item['titre'])
+                
+                with st.spinner("Remplacement..."):
+                    exclude_updated = ", ".join(st.session_state.seen_items)
+                    # Prompt de remplacement ultra-contextuel
+                    replace_prompt = f"""
+                    RÔLE : Curateur expert en {app_mode}.
+                    CONTEXTE : {current_context} (TRÈS IMPORTANT : respecter strictement ce genre/style).
+                    RECHERCHE ORIGINALE : "{st.session_state.last_query}"
+                    EXCLURE : {exclude_updated}
+                    MISSION : Propose 1 SEULE nouvelle pépite.
+                    FORMAT JSON : [{{"titre": "...", "desc": "...", "synopsis": "..."}}]
+                    """
+                    
+                    try:
+                        resp = model.generate_content(replace_prompt)
+                        match = re.search(r'\[.*\]', resp.text, re.DOTALL)
+                        if match:
+                            new_data = json.loads(match.group())[0]
+                            # On récupère l'image en HD
+                            new_data['img'] = fetch_image_hd(new_data['titre'], app_mode)
+                            
+                            # MISE À JOUR CHIRURGICALE DE LA LISTE
+                            st.session_state.current_recos[i] = new_data
+                            st.rerun()
+                    except Exception as e:
+                        st.toast("⚠️ L'IA a eu un petit hoquet, réessayez !")
+
+            # 4. Bouton WhatsApp
             st.markdown(f"""
                 <a href="{whatsapp_url}" target="_blank" style="text-decoration:none;">
                     <button style="width:100%; background-color:#25D366 !important; color:black; border:none; border-radius:9999px; padding:10px; margin-top:10px; cursor:pointer; font-weight:bold;">
-                        📲 Partager sur WhatsApp
+                        📲 Partager
                     </button>
                 </a>
             """, unsafe_allow_html=True)
 
-            # 4. Bouton d'ajout à la bibliothèque [cite: 2026-01-06]
+            # 5. Bouton Bibliothèque
             if st.button(f"✅ J'y ai joué/vu", key=f"p_{i}", use_container_width=True):
                 if st.session_state.user_email:
                     save_item(st.session_state.user_email, app_mode, item['titre'])
-                    st.toast(f"Ajouté : {item['titre']} !")
                 st.session_state.seen_items.append(item['titre'])
                 st.session_state.current_recos = None
                 st.rerun()
+
+    # --- BOUTON GLOBAL TOUT EN BAS (Sorti de la boucle) ---
+    st.write("---")
+    _, c_reload, _ = st.columns([1, 2, 1])
+    with c_reload:
+        if st.button("🔄 Proposer 3 autres options", use_container_width=True):
+            for item in st.session_state.current_recos:
+                st.session_state.seen_items.append(item['titre'])
+            st.session_state.current_recos = None
+            st.rerun()
 
 
 # --- TAB BIBLIOTHÈQUE (Section 7) ---
@@ -426,4 +544,3 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
-
