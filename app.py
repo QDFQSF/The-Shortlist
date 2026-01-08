@@ -15,9 +15,9 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # --- CONFIGURATION SÉCURISÉE ---
 # On essaie de lire les secrets (pour le Web), sinon on prend la valeur locale (pour ton PC)
 try:
-    api_key = st.secrets["AIzaSyCTc5bi9aMFwucdHsMd1P-r6T1oS_mUJu4"]
+    api_key = st.secrets["AIzaSyDin9pcCwmmYNiiPlxRzGcS7URCfCg9qLE"]
 except:
-    api_key = "AIzaSyDin9pcCwmmYNiiPlxRzGcS7URCfCg9qLE" # Uniquement pour tes tests locaux
+    api_key = "AIzaSyCTc5bi9aMFwucdHsMd1P-r6T1oS_mUJu4" # Uniquement pour tes tests locaux
 
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel(model_name="gemini-3-flash-preview") # Version stable et rapide
@@ -321,49 +321,49 @@ with tab_search:
             except Exception as e:
                 st.error(f"Erreur IA : {e}")
 
-    # --- AFFICHAGE DES RÉSULTATS (Section 6) ---
-    if st.session_state.current_recos:
-        st.write("---")
-        cols = st.columns(3)
-        for i, item in enumerate(st.session_state.current_recos):
-            with cols[i]:
-                # --- 1. ON GÉNÈRE LE LIEN ICI (DANS LA BOUCLE) ---
-                affiliate_link = get_smart_link(item['titre'], app_mode)
-                
-                img_url = item['img'] if item['img'] else "https://placehold.co/400x600"
-                
-                # --- 2. ON UTILISE LA VARIABLE DANS LE MARKDOWN ---
-                st.markdown(f"""
-                    <div class="game-card">
-                        <div>
-                            <img src="{img_url}" style="width:100%; height:250px; object-fit:cover; border-radius:15px;">
-                            <div style="font-weight:800; margin-top:15px; font-size:1.1rem;">{item['titre']}</div>
-                            <div style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-top:10px;">{item['desc']}</div>
-                        </div>
-                        <a href="{affiliate_link}" target="_blank" class="price-action">🛒 Voir le prix</a>
+    # --- 6. AFFICHAGE DES RÉSULTATS (Section 6) ---
+if st.session_state.current_recos:
+    st.write("---")
+    cols = st.columns(3)
+    for i, item in enumerate(st.session_state.current_recos):
+        with cols[i]:
+            # 1. On génère les liens nécessaires [cite: 2026-01-04]
+            affiliate_link = get_smart_link(item['titre'], app_mode)
+            share_text = f"Regarde ce que The Shortlist m'a déniché : {item['titre']} ! Ça a l'air top : {affiliate_link}"
+            whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
+            
+            img_url = item['img'] if item['img'] else "https://placehold.co/400x600"
+            
+            # 2. Affichage de la Carte Visuelle [cite: 2026-01-06]
+            st.markdown(f"""
+                <div class="game-card">
+                    <div>
+                        <img src="{img_url}" style="width:100%; height:250px; object-fit:cover; border-radius:15px;">
+                        <div style="font-weight:800; margin-top:15px; font-size:1.1rem;">{item['titre']}</div>
+                        <div style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-top:10px;">{item['desc']}</div>
                     </div>
-                """, unsafe_allow_html=True)
-                
-                # Correction du bouton d'ajout [cite: 2026-01-06]
-                if st.button(f"✅ J'y ai joué/vu", key=f"p_{i}", use_container_width=True):
-                    if st.session_state.user_email:
-                        save_item(st.session_state.user_email, app_mode, item['titre'])
-                        st.toast(f"Ajouté : {item['titre']} !")
-                    st.session_state.seen_items.append(item['titre'])
-                    st.session_state.current_recos = None
-                    st.rerun()
+                    <a href="{affiliate_link}" target="_blank" class="price-action">🛒 Voir le prix</a>
+                </div>
+            """, unsafe_allow_html=True)
 
-# --- BOUTON DE PARTAGE WHATSAPP ---
-share_text = f"Regarde ce que The Shortlist m'a déniché : {item['titre']} ! Ça a l'air top : {affiliate_link}"
-whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
+            # 3. Bouton WhatsApp (Aligné dans la boucle) [cite: 2026-01-04]
+            st.markdown(f"""
+                <a href="{whatsapp_url}" target="_blank" style="text-decoration:none;">
+                    <button style="width:100%; background-color:#25D366 !important; color:black; border:none; border-radius:9999px; padding:10px; margin-top:10px; cursor:pointer; font-weight:bold;">
+                        📲 Partager sur WhatsApp
+                    </button>
+                </a>
+            """, unsafe_allow_html=True)
 
-st.markdown(f"""
-    <a href="{whatsapp_url}" target="_blank" style="text-decoration:none;">
-        <button style="width:100%; background-color:#25D366 !important; color:black; border:none; border-radius:9999px; padding:10px; margin-top:10px; cursor:pointer; font-weight:bold;">
-             📲 Partager sur WhatsApp
-        </button>
-    </a>
-""", unsafe_allow_html=True)
+            # 4. Bouton d'ajout à la bibliothèque [cite: 2026-01-06]
+            if st.button(f"✅ J'y ai joué/vu", key=f"p_{i}", use_container_width=True):
+                if st.session_state.user_email:
+                    save_item(st.session_state.user_email, app_mode, item['titre'])
+                    st.toast(f"Ajouté : {item['titre']} !")
+                st.session_state.seen_items.append(item['titre'])
+                st.session_state.current_recos = None
+                st.rerun()
+
 
 # --- TAB BIBLIOTHÈQUE (Section 7) ---
 with tab_lib:
@@ -425,5 +425,4 @@ with tab_lib:
             with c4:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
-
                     st.rerun()
