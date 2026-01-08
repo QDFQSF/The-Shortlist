@@ -267,7 +267,7 @@ st.sidebar.write("---")
 st.sidebar.subheader("☕ Soutenir le projet")
 st.sidebar.write("L'IA et les serveurs ont un coût. Si The Shortlist vous aide, n'hésitez pas !")
 st.sidebar.markdown("""
-    <a href="https://www.buymeacoffee.com/ton_pseudo" target="_blank">
+    <a href="https://www.buymeacoffee.com/theshortlist" target="_blank">
         <button style="width:100%; background-color:#FFDD00; color:black; border:none; border-radius:10px; padding:10px; font-weight:bold; cursor:pointer;">
             💛 Offre-moi un café
         </button>
@@ -544,3 +544,4 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
