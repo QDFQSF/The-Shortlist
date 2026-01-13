@@ -202,8 +202,6 @@ st.markdown("""
         display: inline-block; padding: 6px 16px; background: rgba(59, 130, 246, 0.1);
         color: #3B82F6 !important; text-decoration: none !important; border-radius: 8px; font-weight: 600; text-align: center;
     }
-    </style>
-    """, unsafe_allow_html=True)
 
     /* Empêche l'actualisation forcée au scroll sur mobile */
     body {
@@ -213,6 +211,10 @@ st.markdown("""
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
     }
+    </style>
+    """, unsafe_allow_html=True)
+
+
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
@@ -553,6 +555,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
