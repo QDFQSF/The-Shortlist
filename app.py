@@ -278,7 +278,7 @@ st.sidebar.write("---")
 st.sidebar.subheader("☕ Soutenir le projet")
 st.sidebar.write("L'IA et les serveurs ont un coût. Un petit café aide à garder l'IA gratuite !")
 
-paypal_url = "https://www.paypal.me/TON_PSEUDO_ICI" # Remplace par ton lien
+paypal_url = "https://www.paypal.me/TheShortlistApp" # Remplace par ton lien
 
 st.sidebar.markdown(f"""
     <a href="{paypal_url}" target="_blank" style="text-decoration: none;">
@@ -570,6 +570,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
