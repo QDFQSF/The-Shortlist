@@ -212,17 +212,21 @@ st.markdown("""
         -webkit-overflow-scrolling: touch;
     }
 
-    /* Cache le menu Streamlit (en haut à droite) et le footer (en bas) */
-    #MainMenu {visibility: hidden;}
+    /* Cache le header, le footer et le menu de déploiement */
+    header[data-testid="stHeader"] {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
-
-/* Supprime l'espace vide laissé par le header */
-    .stAppDeployButton {
-        display: none !important;
-   }
-    </style>
-    """, unsafe_allow_html=True)
+    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    
+    /* Supprime spécifiquement le bandeau "Hosted with Streamlit" */
+    .stAppDeployButton {display: none !important;}
+    div[data-testid="stFooter"] {display: none !important;}
+    
+    /* Ajuste la marge en bas pour compenser la disparition du footer */
+    .main .block-container {
+        padding-bottom: 3rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 
 
@@ -580,6 +584,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
