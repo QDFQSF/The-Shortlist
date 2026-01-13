@@ -212,23 +212,30 @@ st.markdown("""
         -webkit-overflow-scrolling: touch;
     }
 
-    /* Cache le header, le footer et le menu de déploiement */
-    header[data-testid="stHeader"] {visibility: hidden;}
-    footer {visibility: hidden;}
-    div[data-testid="stStatusWidget"] {visibility: hidden;}
+    /* 1. On garde le bouton du menu mais on cache le reste du header */
+    header[data-testid="stHeader"] {
+        background-color: rgba(0,0,0,0);
+    }
+    /* Cache uniquement le bouton 'Deploy' et le menu Streamlit en haut à droite */
+    .stAppDeployButton, [data-testid="stToolbar"] {
+        display: none !important;
+    }
+
+    /* 2. Suppression radicale du bandeau 'Hosted with Streamlit' */
+    footer {visibility: hidden !important;}
+    div[data-testid="stStatusWidget"] {display: none !important;}
     
-    /* Supprime spécifiquement le bandeau "Hosted with Streamlit" */
-    .stAppDeployButton {display: none !important;}
-    div[data-testid="stFooter"] {display: none !important;}
-    
-    /* Ajuste la marge en bas pour compenser la disparition du footer */
+    /* Ciblage spécifique du bandeau rouge de Streamlit Cloud */
+    .st-emotion-cache-zq5wmm {display: none !important;} 
+    [data-testid="stFooter"] {display: none !important;}
+
+    /* 3. On remonte un peu le contenu pour combler le vide */
     .main .block-container {
-        padding-bottom: 3rem;
+        padding-top: 2rem;
+        padding-bottom: 0rem;
     }
 </style>
 """, unsafe_allow_html=True)
-
-
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
