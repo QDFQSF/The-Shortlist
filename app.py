@@ -16,7 +16,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # --- CONFIGURATION SÉCURISÉE ---
 # On essaie de lire les secrets (pour le Web), sinon on prend la valeur locale (pour ton PC)
 try:
-    api_key = st.secrets["AIzaSyCUnAP7WRxlklkE0ExCmGv4apHGeaIiEwc"]
+    api_key = st.secrets["GEMINI_API_KEY"]
 except:
     api_key = "" # Uniquement pour tes tests locaux
 
@@ -544,4 +544,5 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
