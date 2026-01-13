@@ -273,15 +273,30 @@ with st.sidebar:
         st.session_state.seen_items = [d['title'] for d in data]
         if st.button("Déconnexion"): st.session_state.user_email = None; st.rerun()
 
-# --- À AJOUTER DANS TA SIDEBAR (SECTION 5) ---
+# --- À REMPLACER DANS TA SIDEBAR (SECTION 5) ---
 st.sidebar.write("---")
 st.sidebar.subheader("☕ Soutenir le projet")
-st.sidebar.write("L'IA et les serveurs ont un coût. Si The Shortlist vous aide, n'hésitez pas !")
-st.sidebar.markdown("""
-    <a href="https://www.buymeacoffee.com/theshortlist" target="_blank">
-        <button style="width:100%; background-color:#FFDD00; color:black; border:none; border-radius:10px; padding:10px; font-weight:bold; cursor:pointer;">
-            💛 Offre-moi un café
-        </button>
+st.sidebar.write("L'IA et les serveurs ont un coût. Un petit café aide à garder l'IA gratuite !")
+
+paypal_url = "https://www.paypal.me/TON_PSEUDO_ICI" # Remplace par ton lien
+
+st.sidebar.markdown(f"""
+    <a href="{paypal_url}" target="_blank" style="text-decoration: none;">
+        <div style="
+            background-color: #0070BA; 
+            color: white; 
+            padding: 12px; 
+            border-radius: 12px; 
+            text-align: center; 
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 10px rgba(0, 112, 186, 0.3);
+        ">
+            <span>💙 Faire un don via PayPal</span>
+        </div>
     </a>
 """, unsafe_allow_html=True)
 
@@ -555,6 +570,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
