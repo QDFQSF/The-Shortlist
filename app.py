@@ -212,30 +212,26 @@ st.markdown("""
         -webkit-overflow-scrolling: touch;
     }
 
-    /* 1. On garde le bouton du menu mais on cache le reste du header */
+    /* 1. RÉTABLIR LE MENU : On rend le header visible mais transparent */
     header[data-testid="stHeader"] {
-        background-color: rgba(0,0,0,0);
-    }
-    /* Cache uniquement le bouton 'Deploy' et le menu Streamlit en haut à droite */
-    .stAppDeployButton, [data-testid="stToolbar"] {
-        display: none !important;
+        background-color: rgba(0,0,0,0) !important;
+        visibility: visible !important;
     }
 
-    /* 2. Suppression radicale du bandeau 'Hosted with Streamlit' */
-    footer {visibility: hidden !important;}
-    div[data-testid="stStatusWidget"] {display: none !important;}
-    
-    /* Ciblage spécifique du bandeau rouge de Streamlit Cloud */
-    .st-emotion-cache-zq5wmm {display: none !important;} 
+    /* 2. CACHER LE SUPERFLU : On cible uniquement les boutons de déploiement et de statut */
+    .stAppDeployButton {display: none !important;}
+    [data-testid="stStatusWidget"] {display: none !important;}
+    #MainMenu {visibility: visible !important;} /* Force le bouton menu */
+
+    /* 3. LE BANDEAU ROUGE : On tente de le rendre invisible sans le supprimer (car il résiste) */
+    footer {display: none !important;}
     [data-testid="stFooter"] {display: none !important;}
-
-    /* 3. On remonte un peu le contenu pour combler le vide */
-    .main .block-container {
-        padding-top: 2rem;
-        padding-bottom: 0rem;
-    }
+    
+    /* Ciblage par attribut pour éviter les changements de noms de classe */
+    div[target="_blank"] { display: none !important; } 
 </style>
 """, unsafe_allow_html=True)
+
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
@@ -591,6 +587,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
