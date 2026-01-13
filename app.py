@@ -207,11 +207,11 @@ st.markdown("""
 
     /* Empêche l'actualisation forcée au scroll sur mobile */
     body {
-    overscroll-behavior-y: contain;
+        overscroll-behavior-y: contain;
     }
     .main {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
 # --- 5. SIDEBAR ---
@@ -553,6 +553,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
