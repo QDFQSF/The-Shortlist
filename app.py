@@ -490,19 +490,19 @@ with tab_lib:
     else:
         full_data = load_data(st.session_state.user_email, app_mode)
         
-        # --- 1. MES FAVORIS ABSOLUS (TOP 5 ALL-TIME) ---
-        st.subheader(f"❤️ Mes Favoris Absolus")
-        # On filtre uniquement ceux qui ont is_favorite = True
+        # --- 1. MES FAVORIS ABSOLUS (TOP 5) ---
+        st.markdown('<p style="font-size:24px; font-weight:900; color:#FF3366;">❤️ MES FAVORIS ABSOLUS</p>', unsafe_allow_html=True)
         absolute_favs = [g for g in full_data if g.get('fav')]
         
         if absolute_favs:
             f_cols = st.columns(5)
-            for idx, g in enumerate(absolute_favs[:5]): # Limite aux 5 premiers
+            for idx, g in enumerate(absolute_favs[:5]):
                 with f_cols[idx]:
                     st.markdown(f"""
-                        <div style="text-align:center; padding:10px; background:rgba(255,51,102,0.1); border:1px solid #FF3366; border-radius:12px; margin-bottom:10px;">
-                            <div style="font-size:1.2rem;">❤️</div>
-                            <strong style="font-size:0.9rem;">{g['title']}</strong>
+                        <div style="text-align:center; padding:15px; background:rgba(255,51,102,0.1); border:1px solid #FF3366; border-radius:15px;">
+                            <div style="font-size:1.5rem; margin-bottom:5px;">❤️</div>
+                            <div style="font-weight:800; font-size:0.9rem; color:white;">{g['title']}</div>
+                            <div style="font-size:0.75rem; color:rgba(255,255,255,0.6);">{g.get('author', '')}</div>
                         </div>
                     """, unsafe_allow_html=True)
         else:
@@ -521,31 +521,38 @@ with tab_lib:
         
         st.write("---")
         
-        # --- 3. LISTE COMPLÈTE AVEC AUTEUR ---
-        search = st.text_input("🔍 Rechercher dans ma liste...", key="lib_search")
+        # --- 3. MA COLLECTION COMPLÈTE ---
+        st.write("---")
+        search = st.text_input("🔍 Rechercher dans ma collection...", key="lib_search")
+        
         for g in [d for d in full_data if search.lower() in d['title'].lower()]:
-            c1, c2, c3, c4 = st.columns([3.5, 0.5, 1, 0.5])
-            
-            # Affichage Titre + Auteur en petit
-            c1.markdown(f"**{g['title']}**")
-            if g.get('author'):
-                c1.caption(f"par {g['author']}")
-            
-            # Bouton Favori (❤️ si oui, 🤍 si non)
-            heart_icon = "❤️" if g.get('fav') else "🤍"
-            if c2.button(heart_icon, key=f"fav_{g['title']}", help="Mettre en favori absolu"):
-                toggle_favorite_db(st.session_state.user_email, app_mode, g['title'], g.get('fav', False))
-                st.rerun()
+            # Conteneur stylisé pour chaque ligne
+            with st.container():
+                c1, c2, c3, c4 = st.columns([4, 1, 1.5, 0.5])
                 
-            with c3:
-                new_n = st.selectbox("Note", [0,1,2,3,4,5], index=g['rating'], key=f"r_{g['title']}", label_visibility="collapsed")
-                if new_n != g['rating']:
-                    update_rating_db(st.session_state.user_email, app_mode, g['title'], new_n)
-                    st.rerun()
-            with c4:
-                if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
-                    delete_item_db(st.session_state.user_email, app_mode, g['title'])
-                    st.rerun()
+                with c1:
+                    st.markdown(f"**{g['title']}**")
+                    if g.get('author'):
+                        st.caption(f"✍️ {g['author']}")
+                
+                with c2:
+                    heart_icon = "❤️" if g.get('fav') else "🤍"
+                    if st.button(heart_icon, key=f"fav_{g['title']}", help="Favori"):
+                        toggle_favorite_db(st.session_state.user_email, app_mode, g['title'], g.get('fav', False))
+                        st.rerun()
+                
+                with c3:
+                    new_n = st.select_slider("Note", options=[0,1,2,3,4,5], value=g['rating'], key=f"r_{g['title']}", label_visibility="collapsed")
+                    if new_n != g['rating']:
+                        update_rating_db(st.session_state.user_email, app_mode, g['title'], new_n)
+                        st.rerun()
+                
+                with c4:
+                    if st.button("🗑️", key=f"del_{g['title']}"):
+                        delete_item_db(st.session_state.user_email, app_mode, g['title'])
+                        st.rerun()
+                st.write("---") # Ligne de séparation
+
 
 
 
