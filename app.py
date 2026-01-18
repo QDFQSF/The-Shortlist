@@ -135,17 +135,20 @@ def get_all_images_parallel(titles, mode):
         return list(executor.map(lambda t: fetch_image_hd(t, mode), titles))
 
 def get_smart_link(title, author, mode):
-    # On combine titre + auteur pour une recherche infaillible sur Amazon
-    full_query = f"{title} {author}" if author else title
-    query_encoded = urllib.parse.quote(full_query)
-    
+    # Pour Instant Gaming, on utilise uniquement le titre (les studios perdent le moteur de recherche)
+    # et on remplace les espaces par des "+" (quote_plus)
     if mode == "🎮 Jeux Vidéo":
-        return f"https://www.instant-gaming.com/fr/recherche/?q={urllib.parse.quote(title)}&igr=theshortlistapp"
+        query_ig = urllib.parse.quote_plus(title)
+        return f"https://www.instant-gaming.com/fr/recherche/?q={query_ig}&igr={INSTANT_GAMING_ID}"
+    
+    # Pour Amazon (Livres, Films), on garde Titre + Auteur pour la précision
+    full_query = f"{title} {author}" if author else title
+    query_amazon = urllib.parse.quote(full_query)
     
     if mode in ["📚 Livres", "🎋 Mangas", "🎬 Films", "📺 Séries"]:
-        return f"https://www.amazon.fr/s?k={query_encoded}&tag={AMAZON_PARTNER_ID}"
+        return f"https://www.amazon.fr/s?k={query_amazon}&tag={AMAZON_PARTNER_ID}"
     
-    return f"https://www.google.com/search?q={query_encoded}"
+    return f"https://www.google.com/search?q={query_amazon}"
 
 # --- 4. DESIGN (STYLE PREMIUM & HAUTE VISIBILITÉ) ---
 st.markdown("""
@@ -348,15 +351,17 @@ with tab_search:
         8. ANALYSE DE LA VIBE : Russian Mafia = ambiance sombre, tension et codes littéraires précis.
         9. QUALITÉ LITTÉRAIRE : Propose des titres récents ou très populaires dans cette niche.
         10. LANGUE : Propose UNIQUEMENT des titres disponibles en FRANÇAIS.
-
-        FORMAT DE RÉPONSE : Réponds uniquement en JSON avec "titre", "auteur" (ou studio) et "desc".
-
+        11. MARKETING : Attribue un badge court (2-3 mots max) à chaque titre parmi : "🔥 Pépite du moment", "💎 Chef-d'œuvre culte", "✨ Très rare", "📈 En tendance", "🌶️ Must-read Spicy" (si Dark Romance).
+        
+        FORMAT JSON : Tu dois impérativement ajouter le champ "badge".
+        
         RÉPONDS UNIQUEMENT AU FORMAT JSON SUIVANT :
         [
           {{
             "titre": "Nom exact",
-            "auteur": "Nom de l'auteur ou du studio de développement",
-            "desc": "Pourquoi ce titre est le choix parfait pour un fan du genre précis demandé."
+            "auteur": "Nom de l'auteur ou studio",
+            "badge": "Le badge choisi",
+            "desc": "..."
           }}
         ]
         """
@@ -403,15 +408,26 @@ if st.session_state.current_recos:
             whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
             img_url = item['img'] if item['img'] else "https://placehold.co/400x600"
             
-            # 2. Affichage de la Carte [cite: 2026-01-06]
+           # Affichage de la Carte avec Badge
+            badge_text = item.get('badge', '⭐ Sélection')
             st.markdown(f"""
-                <div class="game-card">
+                <div class="game-card" style="position: relative;">
+                    <div style="position: absolute; top: 10px; right: 10px; background: #3B82F6; color: white; 
+                                padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 900; z-index: 10;
+                                box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+                        {badge_text}
+                    </div>
                     <div>
                         <img src="{img_url}" style="width:100%; height:250px; object-fit:cover; border-radius:15px;">
-                        <div style="font-weight:800; margin-top:15px; font-size:1.1rem;">{item['titre']}</div>
-                        <div style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-top:10px;">{item['desc']}</div>
+                        <div style="font-weight:800; margin-top:15px; font-size:1.1rem; color:white;">{item['titre']}</div>
+                        <div style="color:#3B82F6; font-size:0.8rem; font-weight:700;">{item.get('auteur', '')}</div>
+                        <div style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-top:10px; line-height:1.4;">{item['desc']}</div>
                     </div>
-                    <a href="{affiliate_link}" target="_blank" class="price-action">🛒 Voir le prix</a>
+                    <a href="{affiliate_link}" target="_blank" class="price-action" style="display: block; text-align: center; 
+                                background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%); color: white; 
+                                text-decoration: none; padding: 12px; border-radius: 12px; margin-top: 15px; font-weight: 800;">
+                        🛒 VOIR LE PRIX
+                    </a>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -552,6 +568,7 @@ with tab_lib:
                         delete_item_db(st.session_state.user_email, app_mode, g['title'])
                         st.rerun()
                 st.write("---") # Ligne de séparation
+
 
 
 
