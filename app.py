@@ -52,20 +52,31 @@ def toggle_favorite_db(email, mode, title, current_status):
     else:
         supabase.table("user_media").update({"is_favorite": new_status}).eq("user_email", email).eq("title", title).eq("category", mode).execute()
 
-def save_item(email, mode, title):
-    """Enregistre le titre proprement selon le mode [cite: 2026-01-06]"""
+def load_data(email, mode):
+    """Charge les données incluant l'auteur/studio [cite: 2026-01-06]"""
+    try:
+        if mode == "🎮 Jeux Vidéo":
+            res = supabase.table("user_library").select("game_title, game_studio, rating, is_favorite").eq("user_email", email).execute()
+            return [{'title': d['game_title'], 'author': d.get('game_studio', ''), 'rating': d['rating'], 'fav': d.get('is_favorite', False)} for d in res.data]
+        else:
+            res = supabase.table("user_media").select("title, author, rating, is_favorite").eq("user_email", email).eq("category", mode).execute()
+            return [{'title': d['title'], 'author': d.get('author', ''), 'rating': d['rating'], 'fav': d.get('is_favorite', False)} for d in res.data]
+    except: return []
+
+def save_item(email, mode, title, author):
+    """Enregistre le titre et l'auteur proprement [cite: 2026-01-06]"""
     if mode == "🎮 Jeux Vidéo":
-        # Pour les jeux, on n'envoie PAS de catégorie
         supabase.table("user_library").insert({
             "user_email": email, 
-            "game_title": title, 
+            "game_title": title,
+            "game_studio": author,
             "rating": 0
         }).execute()
     else:
-        # Pour le reste, on précise la catégorie (Film, Livre, etc.) [cite: 2026-01-06]
         supabase.table("user_media").insert({
             "user_email": email, 
             "title": title, 
+            "author": author,
             "category": mode, 
             "rating": 0
         }).execute()
@@ -452,10 +463,11 @@ if st.session_state.current_recos:
                 </a>
             """, unsafe_allow_html=True)
 
-            # 5. Bouton Bibliothèque
+            # 5. Bouton Bibliothèque avec Auteur
             if st.button(f"✅ J'y ai joué/vu", key=f"p_{i}", use_container_width=True):
                 if st.session_state.user_email:
-                    save_item(st.session_state.user_email, app_mode, item['titre'])
+                    # On passe bien item['auteur'] récupéré par l'IA [cite: 2026-01-04]
+                    save_item(st.session_state.user_email, app_mode, item['titre'], item.get('auteur', ''))
                 st.session_state.seen_items.append(item['titre'])
                 st.session_state.current_recos = None
                 st.rerun()
@@ -509,13 +521,15 @@ with tab_lib:
         
         st.write("---")
         
-        # --- 3. LISTE COMPLÈTE AVEC OPTION FAVORIS ---
+        # --- 3. LISTE COMPLÈTE AVEC AUTEUR ---
         search = st.text_input("🔍 Rechercher dans ma liste...", key="lib_search")
         for g in [d for d in full_data if search.lower() in d['title'].lower()]:
-            # On ajoute une colonne pour le bouton Coeur
             c1, c2, c3, c4 = st.columns([3.5, 0.5, 1, 0.5])
             
+            # Affichage Titre + Auteur en petit
             c1.markdown(f"**{g['title']}**")
+            if g.get('author'):
+                c1.caption(f"par {g['author']}")
             
             # Bouton Favori (❤️ si oui, 🤍 si non)
             heart_icon = "❤️" if g.get('fav') else "🤍"
@@ -532,6 +546,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
