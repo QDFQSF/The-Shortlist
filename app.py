@@ -374,16 +374,23 @@ with tab_search:
                 
                 if json_match:
                     recos = json.loads(json_match.group())
-                    # Booster de vitesse : Chargement parallèle des images
-                    imgs = get_all_images_parallel([r['titre'] for r in recos], app_mode)
-                    for i, r in enumerate(recos): 
-                        r['img'] = imgs[i]
+                    # On met les images à None pour afficher le texte d'abord
+                    for r in recos: r['img'] = None 
                     st.session_state.current_recos = recos
+                    st.rerun() # On affiche les titres immédiatement !
                 else:
                     st.error("Erreur de formatage de l'IA. Réessayez.")
             except Exception as e:
                 st.error(f"Erreur IA : {e}")
-
+                
+# --- BOOSTER : CHARGEMENT DES IMAGES APRES LE TEXTE ---
+    if st.session_state.current_recos:
+        for i, item in enumerate(st.session_state.current_recos):
+            if item.get('img') is None: # Si l'image n'est pas encore là
+                with st.spinner(f"Chargement visuel de {item['titre']}..."):
+                    img_url = fetch_image_hd(item['titre'], app_mode)
+                    st.session_state.current_recos[i]['img'] = img_url or "https://placehold.co/400x600"
+                    st.rerun() # Affiche l'image dès qu'elle est trouvée
     # --- 6. AFFICHAGE DES RÉSULTATS (Section 6) ---
 if st.session_state.current_recos:
     st.write("---")
@@ -539,6 +546,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
