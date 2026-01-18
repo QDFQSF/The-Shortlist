@@ -123,21 +123,18 @@ def get_all_images_parallel(titles, mode):
     with ThreadPoolExecutor() as executor:
         return list(executor.map(lambda t: fetch_image_hd(t, mode), titles))
 
-def get_smart_link(title, mode):
-    """Lien d'affiliation Instant Gaming corrigé avec le slash obligatoire"""
-    # quote_plus transforme les espaces en '+' pour le moteur de recherche
-    query = urllib.parse.quote_plus(title)
+def get_smart_link(title, author, mode):
+    # On combine titre + auteur pour une recherche infaillible sur Amazon
+    full_query = f"{title} {author}" if author else title
+    query_encoded = urllib.parse.quote(full_query)
     
-    # 🎮 JEUX VIDÉO : Note bien le "/" AVANT le "?" c'est lui qui évite le 404
     if mode == "🎮 Jeux Vidéo":
-        return f"https://www.instant-gaming.com/fr/recherche/?q={query}&igr=theshortlistapp"
+        return f"https://www.instant-gaming.com/fr/recherche/?q={urllib.parse.quote(title)}&igr=theshortlistapp"
     
-    # Reste du code Amazon (qui est déjà bon selon tes tests)
-    query_amazon = urllib.parse.quote(title)
     if mode in ["📚 Livres", "🎋 Mangas", "🎬 Films", "📺 Séries"]:
-        return f"https://www.amazon.fr/s?k={query_amazon}&tag=theshorlistap-21"
+        return f"https://www.amazon.fr/s?k={query_encoded}&tag={AMAZON_PARTNER_ID}"
     
-    return f"https://www.google.com/search?q={query_amazon}"
+    return f"https://www.google.com/search?q={query_encoded}"
 
 # --- 4. DESIGN (STYLE PREMIUM & HAUTE VISIBILITÉ) ---
 st.markdown("""
@@ -321,7 +318,7 @@ with tab_search:
         favs = [g['title'] for g in lib if g['rating'] >= 4]
         exclude = ", ".join(st.session_state.seen_items)
         
-        # PROMPT ULTRA-RESTRICTIF POUR ÉVITER LE HORS-SUJET
+        # PROMPT ULTRA-RESTRICTIF AMÉLIORÉ (V2)
         prompt = f"""
         RÔLE : Tu es un bibliothécaire et curateur d'élite spécialisé en {app_mode}.
         RECHERCHE ACTUELLE : "{st.session_state.last_query}"
@@ -330,22 +327,24 @@ with tab_search:
         STYLE CIBLÉ : {selected_genre}
 
         RÈGLES D'OR ABSOLUES :
-        1. SOUS-GENRE STRICT : Si la recherche ou les favoris indiquent un genre précis (ex: Dark Romance, Soulslike, Seinen), tu as INTERDICTION de proposer un autre genre. Un fan de Dark Romance ne veut pas de livres de mathématiques ou de fantaisie classique.
-        2. PAS DE DOUBLONS DE FRANCHISE : Ne propose JAMAIS deux titres de la même licence ou du même univers. (Ex: Si tu proposes un Naruto, les deux autres doivent être des mangas TOTALEMENT DIFFÉRENTS).
-        3. PAS DE SEQUELS : Ne propose pas le "Tome 2" ou un "Spin-off" d'un titre déjà connu ou présent dans la liste.
+        1. SOUS-GENRE STRICT : Si la recherche ou les favoris indiquent un genre précis, tu as INTERDICTION de proposer un autre genre.
+        2. PAS DE DOUBLONS DE FRANCHISE : Ne propose JAMAIS deux titres de la même licence.
+        3. PAS DE SEQUELS : Ne propose pas le "Tome 2" ou un "Spin-off".
         4. NOUVEAUTÉ : Priorise des pépites avec une ambiance identique mais d'auteurs/studios différents.
         5. PLATEFORME : {selected_platform}.
         6. EXCLUSIVITÉ : Propose 3 titres qui partagent la MÊME VIBE psychologique et thématique.
-        DIRECTIVES CRUCIALES :
-        7. AMBIGUÏTÉ DE GENRE : Si l'utilisateur cherche un thème comme "Mafia", "Boss", ou "Enemies to lovers" dans la catégorie Livres, privilégie TOUJOURS la FICTION (notamment la Dark Romance si le genre est sélectionné) plutôt que les documentaires historiques.
-        8. ANALYSE DE LA VIBE : Ne te contente pas des mots-clés. Si l'utilisateur cherche "Russian Mafia", il veut l'ambiance sombre, la tension et les codes de ce genre littéraire précis.
-        9. QUALITÉ LITTÉRAIRE : Propose des titres récents ou très populaires dans cette niche spécifique.
-        10. FORMAT : Réponds uniquement en JSON avec "titre" et "desc".
+        7. AMBIGUÏTÉ DE GENRE : Privilégie TOUJOURS la FICTION (notamment la Dark Romance) plutôt que les documentaires.
+        8. ANALYSE DE LA VIBE : Russian Mafia = ambiance sombre, tension et codes littéraires précis.
+        9. QUALITÉ LITTÉRAIRE : Propose des titres récents ou très populaires dans cette niche.
+        10. LANGUE : Propose UNIQUEMENT des titres disponibles en FRANÇAIS.
+
+        FORMAT DE RÉPONSE : Réponds uniquement en JSON avec "titre", "auteur" (ou studio) et "desc".
 
         RÉPONDS UNIQUEMENT AU FORMAT JSON SUIVANT :
         [
           {{
             "titre": "Nom exact",
+            "auteur": "Nom de l'auteur ou du studio de développement",
             "desc": "Pourquoi ce titre est le choix parfait pour un fan du genre précis demandé."
           }}
         ]
@@ -387,7 +386,8 @@ if st.session_state.current_recos:
     for i, item in enumerate(st.session_state.current_recos):
         with cols[i]:
             # 1. Génération des liens [cite: 2026-01-04]
-            affiliate_link = get_smart_link(item['titre'], app_mode)
+            auteur_item = item.get('auteur', '')
+            affiliate_link = get_smart_link(item['titre'], auteur_item, app_mode)
             share_text = f"Regarde ce que The Shortlist m'a déniché : {item['titre']} ! {affiliate_link}"
             whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
             img_url = item['img'] if item['img'] else "https://placehold.co/400x600"
@@ -409,7 +409,8 @@ if st.session_state.current_recos:
                 # On peut ici afficher un texte récupéré de l'API ou demander à l'IA d'en générer un court
                 st.write(f"Découvrez l'univers de **{item['titre']}**. Un choix incontournable pour les amateurs du genre.")
                 # Lien "En savoir plus" dynamique
-                more_info_url = f"https://www.google.com/search?q={urllib.parse.quote(item['titre'] + ' synopsis')}"
+                synopsis_query = f"{item['titre']} {auteur_item} synopsis français"
+                more_info_url = f"https://www.google.com/search?q={urllib.parse.quote(synopsis_query)}"
                 st.markdown(f"[🔍 En savoir plus]({more_info_url})")
 
             # 4. LE BOUTON DE REJET (FIXÉ)
@@ -531,6 +532,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
