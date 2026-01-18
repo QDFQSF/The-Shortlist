@@ -352,37 +352,30 @@ with tab_search:
         """
         
         with st.spinner('L\'IA analyse votre demande...'):
-        try:
-            response = model.generate_content(prompt)
-            json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
-            
-            if json_match:
-                recos = json.loads(json_match.group())
+            try:
+                # 1. Appel à l'IA (Gemini 3 Flash Preview)
+                response = model.generate_content(prompt)
+                json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
                 
-                # ÉTAPE CLÉ : On lance les 3 recherches d'images en MÊME TEMPS
-                # Cela prendra le temps de l'image la plus lente (max 2-3 sec) au lieu de s'additionner.
-                with ThreadPoolExecutor(max_workers=3) as executor:
-                    titles = [r['titre'] for r in recos]
-                    image_results = list(executor.map(lambda t: fetch_image_turbo(t, app_mode), titles))
-                
-                for i, r in enumerate(recos):
-                    r['img'] = image_results[i]
-                
-                st.session_state.current_recos = recos
-                st.rerun()
+                if json_match:
+                    recos = json.loads(json_match.group())
+                    
+                    # 2. CHARGEMENT PARALLÈLE (VITESSE TURBO)
+                    # On cherche les 3 images en même temps au lieu d'une par une
+                    with ThreadPoolExecutor(max_workers=3) as executor:
+                        titles = [r['titre'] for r in recos]
+                        # On utilise la fonction turbo avec le timeout de 2s
+                        image_results = list(executor.map(lambda t: fetch_image_turbo(t, app_mode), titles))
+                    
+                    for i, r in enumerate(recos):
+                        r['img'] = image_results[i]
+                    
+                    st.session_state.current_recos = recos
+                    st.rerun() 
                 else:
                     st.error("Erreur de formatage de l'IA. Réessayez.")
             except Exception as e:
                 st.error(f"Erreur IA : {e}")
-                
-# --- BOOSTER : CHARGEMENT DES IMAGES APRES LE TEXTE ---
-    if st.session_state.current_recos:
-        for i, item in enumerate(st.session_state.current_recos):
-            if item.get('img') is None: # Si l'image n'est pas encore là
-                with st.spinner(f"Chargement visuel de {item['titre']}..."):
-                    img_url = fetch_image_hd(item['titre'], app_mode)
-                    st.session_state.current_recos[i]['img'] = img_url or "https://placehold.co/400x600"
-                    st.rerun() # Affiche l'image dès qu'elle est trouvée
     # --- 6. AFFICHAGE DES RÉSULTATS (Section 6) ---
 if st.session_state.current_recos:
     st.write("---")
@@ -538,6 +531,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
