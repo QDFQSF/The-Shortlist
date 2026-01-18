@@ -85,54 +85,39 @@ def delete_item_db(email, mode, title):
 # --- 3. RÉCUPÉRATION DES IMAGES (HD & PRO) ---
 
 @lru_cache(maxsize=128)
-def fetch_image_hd(title, mode):
-    """Récupère des images haute définition via des APIs spécialisées"""
+def fetch_image_turbo(title, mode):
+    """Version rapide : Timeout réduit et APIs simplifiées"""
     try:
+        # On réduit le timeout à 2s. Si l'API ne répond pas, on passe à la suite.
+        t_out = 2 
+        
         if mode == "🎮 Jeux Vidéo":
             url = f"https://api.rawg.io/api/games?key=aaa189410c114919ab95e6a90ada62f1&search={urllib.parse.quote(title)}&page_size=1"
-            r = requests.get(url, timeout=5).json()
+            r = requests.get(url, timeout=t_out).json()
             return r['results'][0]['background_image'] if r.get('results') else None
 
         elif mode in ["🎬 Films", "📺 Séries"]:
             stype = "tv" if mode == "📺 Séries" else "movie"
             url = f"https://api.themoviedb.org/3/search/{stype}?api_key={TMDB_API_KEY}&query={urllib.parse.quote(title)}"
-            r = requests.get(url).json()
+            r = requests.get(url, timeout=t_out).json()
             if r.get('results') and r['results'][0].get('poster_path'):
-                return f"https://image.tmdb.org/t/p/w500{r['results'][0]['poster_path']}"
+                return f"https://image.tmdb.org/t/p/w300{r['results'][0]['poster_path']}"
 
+        elif mode == "📚 Livres":
+            # Open Library est souvent plus rapide que Google Books pour les couvertures
+            url = f"https://openlibrary.org/search.json?title={urllib.parse.quote(title)}&limit=1"
+            r = requests.get(url, timeout=t_out).json()
+            if r.get('docs') and r['docs'][0].get('cover_i'):
+                return f"https://covers.openlibrary.org/b/id/{r['docs'][0]['cover_i']}-M.jpg"
+            
         elif mode in ["🧧 Animés", "🎋 Mangas"]:
-            # Jikan API pour des affiches d'animés HD
             mtype = "manga" if mode == "🎋 Mangas" else "anime"
             url = f"https://api.jikan.moe/v4/{mtype}?q={urllib.parse.quote(title)}&limit=1"
-            r = requests.get(url).json()
-            if r.get('data'):
-                return r['data'][0]['images']['jpg']['large_image_url']
+            r = requests.get(url, timeout=t_out).json()
+            return r['data'][0]['images']['jpg']['image_url'] if r.get('data') else None
 
-        # --- LIVRES (GOOGLE BOOKS AVEC HD HACK) ---
-        elif mode == "📚 Livres":
-            # On tente Google Books avec forçage de résolution
-            url = f"https://www.googleapis.com/books/v1/volumes?q={urllib.parse.quote(title)}&maxResults=1"
-            r = requests.get(url, timeout=5).json()
-            if r.get('items'):
-                volume_info = r['items'][0]['volumeInfo']
-                img_links = volume_info.get('imageLinks', {})
-                # On cherche la plus grande taille disponible
-                img = img_links.get('extraLarge') or img_links.get('large') or img_links.get('medium') or img_links.get('thumbnail')
-                
-                if img:
-                    # HD HACK : On force le HTTPS, on enlève les bords 'curl' et on booste le zoom
-                    img = img.replace("http://", "https://")
-                    img = img.replace("&edge=curl", "") 
-                    img = img.replace("zoom=1", "zoom=3") 
-                    return img
-            
-            # FALLBACK : Open Library HD
-            url = f"https://openlibrary.org/search.json?title={urllib.parse.quote(title)}&limit=1"
-            r = requests.get(url).json()
-            if r.get('docs') and r['docs'][0].get('cover_i'):
-                return f"https://covers.openlibrary.org/b/id/{r['docs'][0]['cover_i']}-L.jpg"
     except: pass
-    return None
+    return "https://placehold.co/400x600?text=Image+indisponible"
 
 def get_all_images_parallel(titles, mode):
     with ThreadPoolExecutor() as executor:
@@ -366,18 +351,25 @@ with tab_search:
         ]
         """
         
-        with st.spinner('L\'IA filtre les pépites pour vous...'):
-            try:
-                # On force Gemini à ne pas sortir du cadre JSON
-                response = model.generate_content(prompt)
-                json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
+        with st.spinner('L\'IA analyse votre demande...'):
+        try:
+            response = model.generate_content(prompt)
+            json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
+            
+            if json_match:
+                recos = json.loads(json_match.group())
                 
-                if json_match:
-                    recos = json.loads(json_match.group())
-                    # On met les images à None pour afficher le texte d'abord
-                    for r in recos: r['img'] = None 
-                    st.session_state.current_recos = recos
-                    st.rerun() # On affiche les titres immédiatement !
+                # ÉTAPE CLÉ : On lance les 3 recherches d'images en MÊME TEMPS
+                # Cela prendra le temps de l'image la plus lente (max 2-3 sec) au lieu de s'additionner.
+                with ThreadPoolExecutor(max_workers=3) as executor:
+                    titles = [r['titre'] for r in recos]
+                    image_results = list(executor.map(lambda t: fetch_image_turbo(t, app_mode), titles))
+                
+                for i, r in enumerate(recos):
+                    r['img'] = image_results[i]
+                
+                st.session_state.current_recos = recos
+                st.rerun()
                 else:
                     st.error("Erreur de formatage de l'IA. Réessayez.")
             except Exception as e:
@@ -546,6 +538,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
