@@ -413,35 +413,35 @@ if st.session_state.current_recos:
                 more_info_url = f"https://www.google.com/search?q={urllib.parse.quote(synopsis_query)}"
                 st.markdown(f"[🔍 En savoir plus]({more_info_url})")
 
-            # 4. LE BOUTON DE REJET (FIXÉ)
+            
+            # 4. LE BOUTON DE REJET (VERSION TURBO & PRÉCISE)
             if st.button(f"❌ Pas pour moi", key=f"rej_{i}", use_container_width=True):
                 st.session_state.seen_items.append(item['titre'])
                 
-                with st.spinner("Remplacement..."):
+                with st.spinner("Recherche d'une autre pépite..."):
                     exclude_updated = ", ".join(st.session_state.seen_items)
-                    # Prompt de remplacement ultra-contextuel
+                    
+                    # On reprend tes règles d'or pour ne pas perdre en qualité [cite: 2026-01-04]
                     replace_prompt = f"""
-                    RÔLE : Curateur expert en {app_mode}.
-                    CONTEXTE : {current_context} (TRÈS IMPORTANT : respecter strictement ce genre/style).
-                    RECHERCHE ORIGINALE : "{st.session_state.last_query}"
-                    EXCLURE : {exclude_updated}
-                    MISSION : Propose 1 SEULE nouvelle pépite.
-                    FORMAT JSON : [{{"titre": "...", "desc": "...", "synopsis": "..."}}]
+                    RÔLE : Curateur expert en {app_mode} ({selected_genre}).
+                    MISSION : Propose 1 SEULE nouvelle pépite différente de : {exclude_updated}.
+                    RÈGLES : Français uniquement, pas de sequels, pas de doublons.
+                    FORMAT JSON : {{"titre": "...", "auteur": "...", "desc": "..."}}
                     """
                     
                     try:
                         resp = model.generate_content(replace_prompt)
-                        match = re.search(r'\[.*\]', resp.text, re.DOTALL)
+                        match = re.search(r'\{.*\}', resp.text, re.DOTALL) # On cherche un objet unique {}
                         if match:
-                            new_data = json.loads(match.group())[0]
-                            # On récupère l'image en HD
-                            new_data['img'] = fetch_image_hd(new_data['titre'], app_mode)
+                            new_data = json.loads(match.group())
+                            # On utilise ta fonction Turbo pour l'image [cite: 2026-01-04]
+                            new_data['img'] = fetch_image_turbo(new_data['titre'], app_mode)
                             
-                            # MISE À JOUR CHIRURGICALE DE LA LISTE
+                            # Mise à jour de la liste en session
                             st.session_state.current_recos[i] = new_data
                             st.rerun()
                     except Exception as e:
-                        st.toast("⚠️ L'IA a eu un petit hoquet, réessayez !")
+                        st.toast("⚠️ Petit hoquet de l'IA, réessayez !")
 
             # 4. Bouton WhatsApp
             st.markdown(f"""
@@ -532,6 +532,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
