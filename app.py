@@ -21,7 +21,7 @@ except:
     api_key = "" # Uniquement pour tes tests locaux
 
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel(model_name="gemini-3-flash-preview") # Version stable et rapide
+model = genai.GenerativeModel(model_name="gemini-2.5-flash") # Version stable et rapide
 
 st.set_page_config(page_title="The Shortlist", page_icon="📑", layout="wide")
 
@@ -531,6 +531,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
