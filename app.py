@@ -225,40 +225,38 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 5. SIDEBAR (MENU CONSOLIDÉ) ---
+# --- 5. SIDEBAR (UN SEUL BLOC SANS DOUBLONS) ---
 with st.sidebar:
-    st.title("Menu")
-    app_mode = st.radio("Catégorie", ["🎮 Jeux Vidéo", "🎬 Films", "📺 Séries", "🧧 Animés", "🎋 Mangas", "📚 Livres"], key="menu_category")
+    st.markdown('<h1 style="color:#3B82F6; font-size:34px; font-weight:900; margin-bottom:20px;">MENU</h1>', unsafe_allow_html=True)
+    
+    app_mode = st.radio("Catégorie", ["🎮 Jeux Vidéo", "🎬 Films", "📺 Séries", "🧧 Animés", "🎋 Mangas", "📚 Livres"], key="final_category_radio")
     
     st.write("---")
-    st.markdown('<p style="color:white; font-size:22px; font-weight:800; margin-top:20px;">🎁 Offres du moment</p>', unsafe_allow_html=True)
+    st.markdown('<p style="color:white; font-size:22px; font-weight:800; margin-bottom:10px;">🎁 Offres du moment</p>', unsafe_allow_html=True)
     if app_mode in ["📚 Livres", "🎋 Mangas"]:
-        st.markdown(f'<div class="deal-card"><div class="deal-title">📖 Kindle Unlimited</div><a class="deal-link" href="https://www.amazon.fr/kindle-dbs/hz/signup?tag={AMAZON_PARTNER_ID}" target="_blank">👉 Essai gratuit</a></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="deal-card"><div class="deal-title">🎧 Audible</div><a class="deal-link" href="https://www.amazon.fr/hz/audible/mlp?tag={AMAZON_PARTNER_ID}" target="_blank">👉 1er Livre Audio offert</a></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="deal-card"><div style="color:#3B82F6; font-weight:800;">📖 Kindle Unlimited</div><a style="color:white; text-decoration:none; font-size:14px;" href="https://www.amazon.fr/kindle-dbs/hz/signup?tag={AMAZON_PARTNER_ID}" target="_blank">👉 Essai gratuit ici</a></div>', unsafe_allow_html=True)
     elif app_mode in ["🎬 Films", "📺 Séries"]:
-        st.markdown(f'<div class="deal-card"><div class="deal-title">🍿 Prime Video</div><a class="deal-link" href="https://www.primevideo.com/?tag={AMAZON_PARTNER_ID}" target="_blank">👉 30 jours gratuits</a></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="deal-card"><div style="color:#3B82F6; font-weight:800;">🍿 Prime Video</div><a style="color:white; text-decoration:none; font-size:14px;" href="https://www.primevideo.com/?tag={AMAZON_PARTNER_ID}" target="_blank">👉 30 jours gratuits</a></div>', unsafe_allow_html=True)
 
     st.write("---")
     if app_mode == "🎮 Jeux Vidéo":
-        selected_platform = st.selectbox("Plateforme", ["Toutes plateformes", "PC", "PS5", "Xbox", "Switch"], key="filter_plat")
+        selected_platform = st.selectbox("Plateforme", ["Toutes plateformes", "PC", "PS5", "Xbox", "Switch"], key="final_plat")
     elif app_mode == "📚 Livres":
-        selected_genre = st.selectbox("Style", ["Général", "Dark Romance", "Thriller", "SF/Fantasy", "Classiques"], key="filter_genre")
+        selected_genre = st.selectbox("Style", ["Général", "Dark Romance", "Thriller", "SF/Fantasy"], key="final_style")
 
     st.write("---")
     if not st.session_state.user_email:
-        email_input = st.text_input("Votre Email", key="sidebar_email")
-        if st.button("Connexion", key="sidebar_conn"):
-            st.session_state.user_email = email_input
+        email = st.text_input("Votre Email", key="sidebar_mail_input")
+        if st.button("Se connecter", key="sidebar_login_btn"):
+            st.session_state.user_email = email
             st.rerun()
     else:
         st.write(f"Connecté : **{st.session_state.user_email}**")
-        if st.button("Déconnexion", key="sidebar_deco"):
-            st.session_state.user_email = None
-            st.rerun()
+        if st.button("Déconnexion", key="sidebar_logout_btn"): st.session_state.user_email = None; st.rerun()
 
     st.write("---")
-    st.markdown('<p style="color:white; font-size:22px; font-weight:800; margin-top:20px;">💙 Soutenir</p>', unsafe_allow_html=True)
-    st.markdown(f'<a href="https://www.paypal.me/TheShortlistApp" target="_blank" class="paypal-button">Faire un don (PayPal)</a>', unsafe_allow_html=True)
+    st.markdown('<p style="color:white; font-size:22px; font-weight:800;">💙 Soutenir</p>', unsafe_allow_html=True)
+    st.markdown(f'<a href="https://www.paypal.me/TheShortlistApp" target="_blank" class="paypal-button" style="background:#0070BA; color:white; padding:12px; border-radius:10px; display:block; text-align:center; text-decoration:none; font-weight:bold;">☕ Offrir un café (PayPal)</a>', unsafe_allow_html=True)
     
     with st.expander("⚖️ Légal"):
         st.caption("The Shortlist est un curateur IA. Partenaire Amazon (bénéfices sur achats affiliés).")
@@ -1096,6 +1094,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
