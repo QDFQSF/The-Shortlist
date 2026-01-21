@@ -6,13 +6,22 @@ from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from streamlit.components.v1 import html
 
+# --- FONCTION DE RÉCUPÉRATION SÉCURISÉE ---
+def get_secret(key, default=""):
+    # On cherche d'abord dans st.secrets (Streamlit Cloud)
+    # Puis dans os.environ (Render / Local)
+    try:
+        return st.secrets[key]
+    except:
+        return os.environ.get(key, default)
+
 # --- 1. CONFIGURATION ---
 AMAZON_PARTNER_ID = "theshorlistap-21"
 INSTANT_GAMING_ID = "theshortlistapp"
-# --- 1. CONFIGURATION SÉCURISÉE ---
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-TMDB_API_KEY = st.secrets["TMDB_API_KEY"]
+# Récupération via la fonction sécurisée
+SUPABASE_URL = get_secret("SUPABASE_URL")
+SUPABASE_KEY = get_secret("SUPABASE_KEY")
+TMDB_API_KEY = get_secret("TMDB_API_KEY")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # --- CONFIGURATION SÉCURISÉE ---
@@ -627,6 +636,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
