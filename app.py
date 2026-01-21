@@ -34,6 +34,14 @@ if 'current_recos' not in st.session_state: st.session_state.current_recos = Non
 if 'last_query' not in st.session_state: st.session_state.last_query = ""
 
 st.header("TheSL")
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
@@ -629,6 +637,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
