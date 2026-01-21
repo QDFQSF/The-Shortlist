@@ -177,7 +177,12 @@ st.markdown("""
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
 
-    
+    st.markdown("""
+    <style>
+    /* Masque le lien "Hosted with Streamlit" en bas à droite */
+    a[href*="streamlit.io"] {
+        display: none !important;
+    }
 
     /* --- SIDEBAR (MENU) : TEXTES BLANCS --- */
     [data-testid="stSidebar"] { background-color: #111827 !important; min-width: 310px !important; }
@@ -636,6 +641,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
