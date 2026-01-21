@@ -166,12 +166,21 @@ st.markdown("""
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
 
-    /* 1. DISPARITION TOTALE DE L'INTERFACE STREAMLIT */
+    /* 1. DISPARITION DES ÉLÉMENTS STREAMLIT CLOUD */
     footer {visibility: hidden !important;}           /* "Made with Streamlit" */
-    header {visibility: hidden !important;}           /* La barre du haut */
-    .stAppDeployButton {display: none !important;}    /* Le bouton Deploy */
-    [data-testid="stHeader"] {display: none !important;} /* Sécurité barre du haut */
-    [data-testid="stToolbar"] {display: none !important;} /* Boutons de statut */
+    .stAppDeployButton {display: none !important;}    /* Bouton Deploy */
+    [data-testid="stDecoration"] {display: none !important;} /* Ligne arc-en-ciel haut */
+    
+    /* SUPPRESSION DU BOUTON "MANAGE APP" EN BAS À DROITE */
+    [data-testid="stStatusWidget"] {display: none !important;} 
+    div[data-testid="stStatusWidget"] {visibility: hidden !important;}
+
+    /* 2. RÉTABLIR L'ACCÈS AU MENU SUR MOBILE */
+    /* On cache le fond du header mais on garde le bouton 'flèche' visible */
+    header[data-testid="stHeader"] {
+        background-color: rgba(0,0,0,0) !important;
+        color: white !important;
+    }
 
     /* --- SIDEBAR (MENU) : TEXTES BLANCS --- */
     [data-testid="stSidebar"] { background-color: #111827 !important; min-width: 310px !important; }
@@ -630,6 +639,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
