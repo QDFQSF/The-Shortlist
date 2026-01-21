@@ -40,6 +40,17 @@ if 'last_query' not in st.session_state: st.session_state.last_query = ""
 
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
 
+def save_rejection(email, title, mode):
+    """Enregistre un rejet avec la date actuelle [cite: 2026-01-06]"""
+    if email:
+        try:
+            supabase.table("user_dislikes").insert({
+                "user_email": email, 
+                "item_title": title, 
+                "category": mode
+            }).execute()
+        except: pass
+
 def load_data(email, mode):
     """Charge les données en incluant le statut favori [cite: 2026-01-06]"""
     try:
@@ -328,9 +339,26 @@ with tab_search:
 
     # --- LOGIQUE IA (Section 6) ---
     if st.session_state.last_query and st.session_state.current_recos is None:
+        import datetime
+        limit_date = (datetime.datetime.now() - datetime.timedelta(days=14)).isoformat()
+        
+        # Récupération des favoris pour l'IA
         lib = load_data(st.session_state.user_email, app_mode) if st.session_state.user_email else []
         favs = [g['title'] for g in lib if g['rating'] >= 4]
-        exclude = ", ".join(st.session_state.seen_items)
+        
+        # Récupération des rejets récents dans Supabase [cite: 2026-01-06]
+        historical_dislikes = []
+        if st.session_state.user_email:
+            try:
+                res_dis = supabase.table("user_dislikes").select("item_title")\
+                    .eq("user_email", st.session_state.user_email)\
+                    .gt("created_at", limit_date).execute()
+                historical_dislikes = [d['item_title'] for d in res_dis.data]
+            except: pass
+            
+        # On combine tout ce qu'on ne veut pas voir
+        exclude_list = list(set(st.session_state.seen_items + historical_dislikes))
+        exclude = ", ".join(exclude_list)
         
        # Définition dynamique du rôle et du type d'objet [cite: 2026-01-04]
         role_expert = "un expert en jeux vidéo et culture gaming" if app_mode == "🎮 Jeux Vidéo" else "un bibliothécaire et curateur littéraire d'élite"
@@ -442,8 +470,11 @@ if st.session_state.current_recos:
                 st.markdown(f"[🔍 En savoir plus]({more_info_url})")
 
             
-            # 4. LE BOUTON DE REJET (VERSION TURBO & PRÉCISE)
             if st.button(f"❌ Pas pour moi", key=f"rej_{i}", use_container_width=True):
+                # 1. On enregistre le rejet dans Supabase [cite: 2026-01-06]
+                save_rejection(st.session_state.user_email, item['titre'], app_mode)
+                
+                # 2. On l'ajoute à la session actuelle
                 st.session_state.seen_items.append(item['titre'])
                 
                 with st.spinner("Recherche d'une autre pépite..."):
@@ -569,6 +600,7 @@ with tab_lib:
                         delete_item_db(st.session_state.user_email, app_mode, g['title'])
                         st.rerun()
                 st.write("---") # Ligne de séparation
+
 
 
 
