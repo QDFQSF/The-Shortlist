@@ -33,6 +33,18 @@ if 'last_query' not in st.session_state: st.session_state.last_query = ""
 
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
 
+def get_ai_summary(title, author, mode):
+    """Génère un résumé flash de 3 lignes maximum [cite: 2026-01-04]"""
+    # On adapte le type de média pour l'IA
+    media_type = "jeu vidéo" if mode == "🎮 Jeux Vidéo" else "ouvrage/média"
+    prompt = f"Fais un résumé très court (maximum 3 lignes) en français pour ce {media_type} : '{title}' par '{author}'. Style direct et accrocheur."
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "Résumé indisponible pour le moment."
+
 def save_rejection(email, title, mode):
     """Enregistre un rejet avec la date actuelle [cite: 2026-01-06]"""
     if email:
@@ -567,7 +579,13 @@ with tab_lib:
                             <div style="color:#3B82F6; font-size:0.8rem; font-weight:700;">{g.get('author', 'Auteur inconnu')}</div>
                         </div>
                     """, unsafe_allow_html=True)
-
+                    
+                    # Nouveau bouton de résumé IA [cite: 2026-01-04]
+                    if st.button("📝 Résumé IA", key=f"sum_{idx}_{g['title']}", use_container_width=True):
+                        with st.spinner("Analyse de l'IA..."):
+                            summary = get_ai_summary(g['title'], g.get('author', ''), app_mode)
+                            st.info(summary) # Affiche le résumé dans un petit encadré bleu
+                            
                     # Boutons d'action sous la carte
                     c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
                     with c_btn1:
@@ -585,6 +603,8 @@ with tab_lib:
                         if st.button("🗑️", key=f"lib_del_{idx}_{g['title']}"):
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
+                            
+
 
 
 
