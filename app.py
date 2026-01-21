@@ -4,6 +4,7 @@ import json, urllib.parse, re, requests
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
+from streamlit.components.v1 import html
 
 # --- 1. CONFIGURATION ---
 AMAZON_PARTNER_ID = "theshorlistap-21"
@@ -31,6 +32,30 @@ if 'user_email' not in st.session_state: st.session_state.user_email = None
 if 'seen_items' not in st.session_state: st.session_state.seen_items = []
 if 'current_recos' not in st.session_state: st.session_state.current_recos = None
 if 'last_query' not in st.session_state: st.session_state.last_query = ""
+
+# --- HACK POUR SUPPRIMER LE BRANDING EXTERNE ---
+html('''
+    <script>
+        // On attend que la page soit chargée
+        window.parent.document.addEventListener("DOMContentLoaded", function(event) {
+            // 1. Cible le badge rouge "Hosted with Streamlit" par son lien
+            var badge = window.parent.document.querySelector('a[href*="streamlit.io"]');
+            if (badge) badge.parentNode.style.display = 'none';
+            
+            // 2. Cible le badge de statut (Manage App)
+            var statusWidget = window.parent.document.querySelector('[data-testid="stStatusWidget"]');
+            if (statusWidget) statusWidget.style.display = 'none';
+
+            // 3. Cache tout élément qui contient "viewerBadge" dans sa classe
+            var viewerBadges = window.parent.document.querySelectorAll('[class^="viewerBadge"]');
+            viewerBadges.forEach(e => e.style.display = 'none');
+        });
+        
+        // Exécution immédiate pour plus de sécurité
+        var viewerBadge = window.parent.document.querySelector('[class*="viewerBadge"]');
+        if (viewerBadge) viewerBadge.style.display = 'none';
+    </script>
+''', height=0)
 
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
 
@@ -166,19 +191,15 @@ st.markdown("""
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
 
-    /* 1. SUPPRESSION RADICALE DES ÉLÉMENTS STREAMLIT CLOUD */
+    st.markdown("""
+    <style>
+    /* Cache le menu, le header et le footer internes */
     #MainMenu {visibility: hidden !important;}
     footer {visibility: hidden !important;}
     header {visibility: hidden !important;}
-    
-    /* Cible le badge rouge en bas à droite (viewerBadge) */
-    div[class^="viewerBadge"] {display: none !important;}
-    
-    /* Cible le widget de statut / Manage App */
-    div[data-testid="stStatusWidget"] {display: none !important;}
-    
-    /* Supprime la barre arc-en-ciel en haut */
-    [data-testid="stDecoration"] {display: none !important;}
+    [data-testid="stHeader"] {display: none !important;}
+    [data-testid="stToolbar"] {display: none !important;}
+    .stAppDeployButton {display: none !important;}
 
     /* --- SIDEBAR (MENU) : TEXTES BLANCS --- */
     [data-testid="stSidebar"] { background-color: #111827 !important; min-width: 310px !important; }
@@ -637,6 +658,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
