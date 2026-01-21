@@ -141,7 +141,7 @@ def get_smart_link(title, author, mode):
     query_encoded = urllib.parse.quote(search_query)
     
     # On utilise votre identifiant Amazon unique pour tout le monde
-    return f"https://www.amazon.fr/s?k={query_encoded}&tag={AMAZON_PARTNER_ID}""
+    return f"https://www.amazon.fr/s?k={query_encoded}&tag={AMAZON_PARTNER_ID}"
 
 # --- 4. DESIGN (STYLE PREMIUM & HAUTE VISIBILITÉ) ---
 st.markdown("""
@@ -555,6 +555,7 @@ with tab_lib:
                         delete_item_db(st.session_state.user_email, app_mode, g['title'])
                         st.rerun()
                 st.write("---") # Ligne de séparation
+
 
 
 
