@@ -334,7 +334,7 @@ with tab_search:
         RECHERCHE ACTUELLE : "{st.session_state.last_query}"
         FAVORIS DE L'UTILISATEUR : {favs}
         DÉJÀ VUS/LUS (À EXCLURE) : {exclude}
-        STYLE CIBLÉ : {selected_genre}}
+        STYLE CIBLÉ : {selected_genre}
 
         RÈGLE ZÉRO (CRITIQUE) : La catégorie sélectionnée est {app_mode}. 
         Tu as l'INTERDICTION ABSOLUE de proposer un livre si la catégorie est Jeux Vidéo. 
@@ -562,6 +562,7 @@ with tab_lib:
                         delete_item_db(st.session_state.user_email, app_mode, g['title'])
                         st.rerun()
                 st.write("---") # Ligne de séparation
+
 
 
 
