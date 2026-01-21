@@ -166,6 +166,14 @@ st.markdown("""
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
 
+    /* 1. DISPARITION TOTALE DE L'INTERFACE STREAMLIT */
+    #MainMenu {visibility: hidden !important;}       /* Le menu hamburger */
+    footer {visibility: hidden !important;}           /* "Made with Streamlit" */
+    header {visibility: hidden !important;}           /* La barre du haut */
+    .stAppDeployButton {display: none !important;}    /* Le bouton Deploy */
+    [data-testid="stHeader"] {display: none !important;} /* Sécurité barre du haut */
+    [data-testid="stToolbar"] {display: none !important;} /* Boutons de statut */
+
     /* --- SIDEBAR (MENU) : TEXTES BLANCS --- */
     [data-testid="stSidebar"] { background-color: #111827 !important; min-width: 310px !important; }
     [data-testid="stSidebar"] h1 { font-size: 34px !important; color: #3B82F6 !important; font-weight: 900 !important; text-transform: uppercase; }
@@ -623,6 +631,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
