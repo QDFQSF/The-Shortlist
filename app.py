@@ -166,21 +166,12 @@ st.markdown("""
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
 
-    /* 1. SUPPRESSION DU BADGE ROUGE "HOSTED WITH STREAMLIT" */
-    /* On cible l'élément par son ID et sa classe interne pour être sûr */
-    #MainMenu {visibility: hidden !important;}
-    footer {visibility: hidden !important;}
-    [data-testid="stHeader"] {background-color: rgba(0,0,0,0) !important;}
-    
-    /* Ciblage du badge de statut et du badge de visionnage en bas à droite */
-    div[data-testid="stStatusWidget"] {display: none !important;}
-    .viewerBadge_container__1QS98 {display: none !important;} /* Badge rouge spécifique */
-    div[class^="viewerBadge"] {display: none !important;}      /* Sécurité si la classe change */
-    
-    /* 2. NETTOYAGE DES LIGNES ET TOOLBARS */
-    [data-testid="stDecoration"] {display: none !important;}
-    [data-testid="stToolbar"] {display: none !important;}
-    .stAppDeployButton {display: none !important;}
+    hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
 
     /* --- SIDEBAR (MENU) : TEXTES BLANCS --- */
     [data-testid="stSidebar"] { background-color: #111827 !important; min-width: 310px !important; }
@@ -639,6 +630,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
