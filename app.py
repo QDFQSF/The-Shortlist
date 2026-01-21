@@ -25,13 +25,6 @@ model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite") # Version stab
 
 st.set_page_config(page_title="The Shortlist", page_icon="📑", layout="wide")
 
-# --- VÉRIFICATION IMPACT.COM (CDKEYS) ---
-import streamlit.components.v1 as components
-components.html(
-    """<meta name="impact-site-verification" value="74efb7a6-7b3d-46c1-bd63-738445306f71">""",
-    height=0,
-)
-
 # INITIALISATION DES ÉTATS
 if 'user_email' not in st.session_state: st.session_state.user_email = None
 if 'seen_items' not in st.session_state: st.session_state.seen_items = []
@@ -267,6 +260,10 @@ with st.sidebar:
     
     with st.expander("⚖️ Légal"):
         st.caption("The Shortlist est un curateur IA. Partenaire Amazon (bénéfices sur achats affiliés).")
+
+# Bloc de vérification pour Impact/CDKeys [cite: 2026-01-04]
+    st.write("---")
+    st.caption("Impact-Site-Verification: 74efb7a6-7b3d-46c1-bd63-738445306f71")
 
 # --- 6. TABS & LOGO ---
 raw_label = app_mode.split(" ")[1]
@@ -600,6 +597,7 @@ with tab_lib:
                         delete_item_db(st.session_state.user_email, app_mode, g['title'])
                         st.rerun()
                 st.write("---") # Ligne de séparation
+
 
 
 
