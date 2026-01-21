@@ -25,6 +25,13 @@ model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite") # Version stab
 
 st.set_page_config(page_title="The Shortlist", page_icon="📑", layout="wide")
 
+# --- VÉRIFICATION IMPACT.COM (CDKEYS) ---
+import streamlit.components.v1 as components
+components.html(
+    """<meta name="impact-site-verification" value="74efb7a6-7b3d-46c1-bd63-738445306f71">""",
+    height=0,
+)
+
 # INITIALISATION DES ÉTATS
 if 'user_email' not in st.session_state: st.session_state.user_email = None
 if 'seen_items' not in st.session_state: st.session_state.seen_items = []
@@ -562,6 +569,7 @@ with tab_lib:
                         delete_item_db(st.session_state.user_email, app_mode, g['title'])
                         st.rerun()
                 st.write("---") # Ligne de séparation
+
 
 
 
