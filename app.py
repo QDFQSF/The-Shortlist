@@ -167,7 +167,6 @@ st.markdown("""
     }
 
     /* 1. DISPARITION TOTALE DE L'INTERFACE STREAMLIT */
-    #MainMenu {visibility: hidden !important;}       /* Le menu hamburger */
     footer {visibility: hidden !important;}           /* "Made with Streamlit" */
     header {visibility: hidden !important;}           /* La barre du haut */
     .stAppDeployButton {display: none !important;}    /* Le bouton Deploy */
@@ -631,6 +630,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
