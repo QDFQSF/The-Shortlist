@@ -33,29 +33,6 @@ if 'seen_items' not in st.session_state: st.session_state.seen_items = []
 if 'current_recos' not in st.session_state: st.session_state.current_recos = None
 if 'last_query' not in st.session_state: st.session_state.last_query = ""
 
-# --- HACK POUR SUPPRIMER LE BRANDING EXTERNE ---
-html('''
-    <script>
-        // On attend que la page soit chargée
-        window.parent.document.addEventListener("DOMContentLoaded", function(event) {
-            // 1. Cible le badge rouge "Hosted with Streamlit" par son lien
-            var badge = window.parent.document.querySelector('a[href*="streamlit.io"]');
-            if (badge) badge.parentNode.style.display = 'none';
-            
-            // 2. Cible le badge de statut (Manage App)
-            var statusWidget = window.parent.document.querySelector('[data-testid="stStatusWidget"]');
-            if (statusWidget) statusWidget.style.display = 'none';
-
-            // 3. Cache tout élément qui contient "viewerBadge" dans sa classe
-            var viewerBadges = window.parent.document.querySelectorAll('[class^="viewerBadge"]');
-            viewerBadges.forEach(e => e.style.display = 'none');
-        });
-        
-        // Exécution immédiate pour plus de sécurité
-        var viewerBadge = window.parent.document.querySelector('[class*="viewerBadge"]');
-        if (viewerBadge) viewerBadge.style.display = 'none';
-    </script>
-''', height=0)
 
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
 
@@ -650,6 +627,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
