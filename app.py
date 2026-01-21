@@ -166,12 +166,19 @@ st.markdown("""
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
 
-    hide_streamlit_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            </style>
-            """
+    /* 1. SUPPRESSION RADICALE DES ÉLÉMENTS STREAMLIT CLOUD */
+    #MainMenu {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    header {visibility: hidden !important;}
+    
+    /* Cible le badge rouge en bas à droite (viewerBadge) */
+    div[class^="viewerBadge"] {display: none !important;}
+    
+    /* Cible le widget de statut / Manage App */
+    div[data-testid="stStatusWidget"] {display: none !important;}
+    
+    /* Supprime la barre arc-en-ciel en haut */
+    [data-testid="stDecoration"] {display: none !important;}
 
     /* --- SIDEBAR (MENU) : TEXTES BLANCS --- */
     [data-testid="stSidebar"] { background-color: #111827 !important; min-width: 310px !important; }
@@ -630,6 +637,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
