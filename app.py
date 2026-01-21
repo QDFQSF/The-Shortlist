@@ -8,9 +8,10 @@ from functools import lru_cache
 # --- 1. CONFIGURATION ---
 AMAZON_PARTNER_ID = "theshorlistap-21"
 INSTANT_GAMING_ID = "theshortlistapp"
-SUPABASE_URL = "https://enkgnmxqvnpvqceueayg.supabase.co"
-SUPABASE_KEY = "sb_secret_mNz02Qr2x9SnGMqIPtxRaw_GUK0f9Hd"
-TMDB_API_KEY = "53f9c070d843a78f4f16579e57bdda32" 
+# --- 1. CONFIGURATION SÉCURISÉE ---
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+TMDB_API_KEY = st.secrets["TMDB_API_KEY"]
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # --- CONFIGURATION SÉCURISÉE ---
@@ -622,6 +623,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
