@@ -325,17 +325,24 @@ with tab_search:
         favs = [g['title'] for g in lib if g['rating'] >= 4]
         exclude = ", ".join(st.session_state.seen_items)
         
-        # PROMPT ULTRA-RESTRICTIF AMÉLIORÉ (V2)
+       # Définition dynamique du rôle et du type d'objet [cite: 2026-01-04]
+        role_expert = "un expert en jeux vidéo et culture gaming" if app_mode == "🎮 Jeux Vidéo" else "un bibliothécaire et curateur littéraire d'élite"
+        format_attendu = "jeu vidéo (pas de livres !)" if app_mode == "🎮 Jeux Vidéo" else "ouvrage ou média"
+
         prompt = f"""
-        RÔLE : Tu es un bibliothécaire et curateur d'élite spécialisé en {app_mode}.
+        RÔLE : Tu es {role_expert}.
         RECHERCHE ACTUELLE : "{st.session_state.last_query}"
         FAVORIS DE L'UTILISATEUR : {favs}
         DÉJÀ VUS/LUS (À EXCLURE) : {exclude}
-        STYLE CIBLÉ : {selected_genre}
+        STYLE CIBLÉ : {selected_genre}}
 
-        RÈGLES D'OR ABSOLUES :
-        1. SOUS-GENRE STRICT : Si la recherche ou les favoris indiquent un genre précis, tu as INTERDICTION de proposer un autre genre.
-        2. PAS DE DOUBLONS DE FRANCHISE : Ne propose JAMAIS deux titres de la même licence.
+        RÈGLE ZÉRO (CRITIQUE) : La catégorie sélectionnée est {app_mode}. 
+        Tu as l'INTERDICTION ABSOLUE de proposer un livre si la catégorie est Jeux Vidéo. 
+        Si l'utilisateur cherche "RDR2", propose des jeux similaires (Western, Open World), jamais de romans.
+
+       RÈGLES D'OR ABSOLUES :
+        1. SOUS-GENRE STRICT : Respecte l'ambiance et les codes du genre {selected_genre}.
+        2. PAS DE DOUBLONS DE FRANCHISE : Ne propose jamais deux titres de la même licence.
         3. PAS DE SEQUELS : Ne propose pas le "Tome 2" ou un "Spin-off".
         4. NOUVEAUTÉ : Priorise des pépites avec une ambiance identique mais d'auteurs/studios différents.
         5. PLATEFORME : {selected_platform}.
@@ -346,15 +353,15 @@ with tab_search:
         10. LANGUE : Propose UNIQUEMENT des titres disponibles en FRANÇAIS.
         11. MARKETING : Attribue un badge court (2-3 mots max) à chaque titre parmi : "🔥 Pépite du moment", "💎 Chef-d'œuvre culte", "✨ Très rare", "📈 En tendance", "🌶️ Must-read Spicy" (si Dark Romance).
         
-        FORMAT JSON : Tu dois impérativement ajouter le champ "badge".
+        FORMAT JSON : Tu dois impérativement ajouter le champ "badge" et "auteur".
         
         RÉPONDS UNIQUEMENT AU FORMAT JSON SUIVANT :
         [
           {{
             "titre": "Nom exact",
-            "auteur": "Nom de l'auteur ou studio",
+            "auteur": "Nom de l'auteur ou du studio",
             "badge": "Le badge choisi",
-            ""desc": "Pourquoi c'est le choix parfait."
+            "desc": "Pourquoi c'est le choix parfait."
           }}
         ]
         """
@@ -555,6 +562,7 @@ with tab_lib:
                         delete_item_db(st.session_state.user_email, app_mode, g['title'])
                         st.rerun()
                 st.write("---") # Ligne de séparation
+
 
 
 
