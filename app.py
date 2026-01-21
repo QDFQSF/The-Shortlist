@@ -261,10 +261,6 @@ with st.sidebar:
     with st.expander("⚖️ Légal"):
         st.caption("The Shortlist est un curateur IA. Partenaire Amazon (bénéfices sur achats affiliés).")
 
-# Bloc de vérification pour Impact/CDKeys [cite: 2026-01-04]
-    st.write("---")
-    st.caption("Impact-Site-Verification: 74efb7a6-7b3d-46c1-bd63-738445306f71")
-
 # --- 6. TABS & LOGO ---
 raw_label = app_mode.split(" ")[1]
 media_label = raw_label.rstrip('s') if raw_label.endswith('s') else raw_label
@@ -597,6 +593,7 @@ with tab_lib:
                         delete_item_db(st.session_state.user_email, app_mode, g['title'])
                         st.rerun()
                 st.write("---") # Ligne de séparation
+
 
 
 
