@@ -224,13 +224,7 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
     }
 
-    
-
-    st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+     footer {display: none !important;} [data-testid="stHeader"] {background: transparent !important;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -629,6 +623,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
