@@ -177,8 +177,7 @@ st.markdown("""
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
 
-    st.markdown("""
-    <style>
+
     /* Masque le lien "Hosted with Streamlit" en bas à droite */
     a[href*="streamlit.io"] {
         display: none !important;
@@ -641,6 +640,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
