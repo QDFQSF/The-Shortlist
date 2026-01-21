@@ -533,6 +533,24 @@ with tab_lib:
     else:
         # 1. Chargement des données
         full_data = load_data(st.session_state.user_email, app_mode)
+
+        # --- DASHBOARD DE STATS ---
+        st.markdown('<p style="font-size:26px; font-weight:900; color:#3B82F6;">📊 MES STATS</p>', unsafe_allow_html=True)
+        
+        # Calculs simples
+        total_items = len(full_data)
+        fav_count = len([g for g in full_data if g.get('fav')])
+        avg_rating = sum([g['rating'] for g in full_data]) / total_items if total_items > 0 else 0
+        
+        c_stat1, c_stat2, c_stat3 = st.columns(3)
+        with c_stat1:
+            st.metric("Titres dans ma liste", total_items)
+        with c_stat2:
+            st.metric("Coups de cœur ❤️", fav_count)
+        with c_stat3:
+            st.metric("Note moyenne ⭐", f"{avg_rating:.1f}/5")
+        
+        st.write("---")
         
         # --- TOP SECTION : FAVORIS ---
         st.markdown('<p style="font-size:26px; font-weight:900; color:#FF3366; margin-bottom:20px;">❤️ MES COUPS DE CŒUR</p>', unsafe_allow_html=True)
@@ -604,6 +622,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
