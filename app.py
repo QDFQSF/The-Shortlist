@@ -44,16 +44,6 @@ def save_rejection(email, title, mode):
             }).execute()
         except: pass
 
-def load_data(email, mode):
-    """Charge les données en incluant le statut favori [cite: 2026-01-06]"""
-    try:
-        if mode == "🎮 Jeux Vidéo":
-            res = supabase.table("user_library").select("game_title, rating, is_favorite").eq("user_email", email).execute()
-            return [{'title': d['game_title'], 'rating': d['rating'], 'fav': d.get('is_favorite', False)} for d in res.data]
-        else:
-            res = supabase.table("user_media").select("title, rating, is_favorite").eq("user_email", email).eq("category", mode).execute()
-            return [{'title': d['title'], 'rating': d['rating'], 'fav': d.get('is_favorite', False)} for d in res.data]
-    except: return []
 
 def toggle_favorite_db(email, mode, title, current_status):
     """Bascule le statut favori (All-time) [cite: 2026-01-06]"""
@@ -524,75 +514,78 @@ if st.session_state.current_recos:
             st.rerun()
 
 
-# --- TAB BIBLIOTHÈQUE (Section 7) ---
+# --- TAB BIBLIOTHÈQUE (Section 7 Optimisée) ---
 with tab_lib:
     if not st.session_state.user_email:
-        st.info("Connecte-toi pour voir ta collection.")
+        st.info("Connectez-vous pour voir votre collection personnelle.")
     else:
+        # 1. Chargement des données
         full_data = load_data(st.session_state.user_email, app_mode)
         
-        # --- 1. MES FAVORIS ABSOLUS (TOP 5) ---
-        st.markdown('<p style="font-size:24px; font-weight:900; color:#FF3366;">❤️ MES FAVORIS ABSOLUS</p>', unsafe_allow_html=True)
+        # --- TOP SECTION : FAVORIS ---
+        st.markdown('<p style="font-size:26px; font-weight:900; color:#FF3366; margin-bottom:20px;">❤️ MES COUPS DE CŒUR</p>', unsafe_allow_html=True)
         absolute_favs = [g for g in full_data if g.get('fav')]
         
         if absolute_favs:
-            f_cols = st.columns(5)
+            fav_cols = st.columns(5)
             for idx, g in enumerate(absolute_favs[:5]):
-                with f_cols[idx]:
+                with fav_cols[idx]:
+                    # On récupère l'image en cache pour la rapidité
+                    img_fav = fetch_image_turbo(g['title'], app_mode)
                     st.markdown(f"""
-                        <div style="text-align:center; padding:15px; background:rgba(255,51,102,0.1); border:1px solid #FF3366; border-radius:15px;">
-                            <div style="font-size:1.5rem; margin-bottom:5px;">❤️</div>
-                            <div style="font-weight:800; font-size:0.9rem; color:white;">{g['title']}</div>
-                            <div style="font-size:0.75rem; color:rgba(255,255,255,0.6);">{g.get('author', '')}</div>
+                        <div style="text-align:center; margin-bottom:20px;">
+                            <img src="{img_fav}" style="width:100%; height:140px; object-fit:cover; border-radius:10px; border:2px solid #FF3366;">
+                            <div style="font-weight:800; font-size:0.8rem; margin-top:5px; color:white; height:35px; overflow:hidden;">{g['title']}</div>
                         </div>
                     """, unsafe_allow_html=True)
         else:
-            st.info("Clique sur le ❤️ à côté d'un titre pour l'épingler ici comme favori absolu !")
+            st.caption("Aucun coup de cœur pour le moment. Cliquez sur le ❤️ dans votre liste !")
 
         st.write("---")
 
-        # --- 2. TOP 10 PAR NOTE ---
-        st.subheader(f"🏆 Mon Top 10 par Note")
-        top_items = sorted([g for g in full_data if g['rating'] > 0], key=lambda x: x['rating'], reverse=True)[:10]
-        if top_items:
-            t_cols = st.columns(5)
-            for idx, g in enumerate(top_items):
-                with t_cols[idx % 5]:
-                    st.markdown(f"""<div class="top-badge"><div style="color:#3B82F6; font-weight:800;">#{idx+1}</div><strong>{g['title']}</strong><br>⭐ {g['rating']}/5</div>""", unsafe_allow_html=True)
+        # --- SECTION : MA COLLECTION ---
+        st.markdown('<p style="font-size:26px; font-weight:900; color:#3B82F6; margin-bottom:20px;">📚 MA COLLECTION</p>', unsafe_allow_html=True)
         
-        st.write("---")
-        
-        # --- 3. MA COLLECTION COMPLÈTE ---
-        st.write("---")
-        search = st.text_input("🔍 Rechercher dans ma collection...", key="lib_search")
-        
-        for g in [d for d in full_data if search.lower() in d['title'].lower()]:
-            # Conteneur stylisé pour chaque ligne
-            with st.container():
-                c1, c2, c3, c4 = st.columns([4, 1, 1.5, 0.5])
-                
-                with c1:
-                    st.markdown(f"**{g['title']}**")
-                    if g.get('author'):
-                        st.caption(f"✍️ {g['author']}")
-                
-                with c2:
-                    heart_icon = "❤️" if g.get('fav') else "🤍"
-                    if st.button(heart_icon, key=f"fav_{g['title']}", help="Favori"):
-                        toggle_favorite_db(st.session_state.user_email, app_mode, g['title'], g.get('fav', False))
-                        st.rerun()
-                
-                with c3:
-                    new_n = st.select_slider("Note", options=[0,1,2,3,4,5], value=g['rating'], key=f"r_{g['title']}", label_visibility="collapsed")
-                    if new_n != g['rating']:
-                        update_rating_db(st.session_state.user_email, app_mode, g['title'], new_n)
-                        st.rerun()
-                
-                with c4:
-                    if st.button("🗑️", key=f"del_{g['title']}"):
-                        delete_item_db(st.session_state.user_email, app_mode, g['title'])
-                        st.rerun()
-                st.write("---") # Ligne de séparation
+        search_lib = st.text_input("🔍 Rechercher un titre sauvegardé...", key="lib_search_input")
+        filtered_data = [d for d in full_data if search_lib.lower() in d['title'].lower()]
+
+        if not filtered_data:
+            st.info("Votre bibliothèque est vide ou aucun titre ne correspond à votre recherche.")
+        else:
+            # Affichage en grille de 3 colonnes
+            lib_cols = st.columns(3)
+            for idx, g in enumerate(filtered_data):
+                col_idx = idx % 3
+                with lib_cols[col_idx]:
+                    img_lib = fetch_image_turbo(g['title'], app_mode)
+                    
+                    # Carte stylisée
+                    st.markdown(f"""
+                        <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:15px; border:1px solid rgba(255,255,255,0.1); margin-bottom:10px;">
+                            <img src="{img_lib}" style="width:100%; height:180px; object-fit:cover; border-radius:10px;">
+                            <div style="font-weight:800; margin-top:10px; color:white;">{g['title']}</div>
+                            <div style="color:#3B82F6; font-size:0.8rem; font-weight:700;">{g.get('author', 'Auteur inconnu')}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                    # Boutons d'action sous la carte
+                    c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
+                    with c_btn1:
+                        heart = "❤️" if g.get('fav') else "🤍"
+                        if st.button(heart, key=f"lib_fav_{idx}_{g['title']}"):
+                            toggle_favorite_db(st.session_state.user_email, app_mode, g['title'], g.get('fav', False))
+                            st.rerun()
+                    with c_btn2:
+                        # Slider compact pour la note
+                        new_note = st.select_slider("Note", options=[0,1,2,3,4,5], value=g['rating'], key=f"lib_r_{idx}_{g['title']}", label_visibility="collapsed")
+                        if new_note != g['rating']:
+                            update_rating_db(st.session_state.user_email, app_mode, g['title'], new_note)
+                            st.rerun()
+                    with c_btn3:
+                        if st.button("🗑️", key=f"lib_del_{idx}_{g['title']}"):
+                            delete_item_db(st.session_state.user_email, app_mode, g['title'])
+                            st.rerun()
+
 
 
 
