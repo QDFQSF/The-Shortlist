@@ -33,6 +33,8 @@ if 'seen_items' not in st.session_state: st.session_state.seen_items = []
 if 'current_recos' not in st.session_state: st.session_state.current_recos = None
 if 'last_query' not in st.session_state: st.session_state.last_query = ""
 
+st.header("TheSL")
+
 
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
 
@@ -168,7 +170,7 @@ st.markdown("""
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
 
-
+    
 
     /* --- SIDEBAR (MENU) : TEXTES BLANCS --- */
     [data-testid="stSidebar"] { background-color: #111827 !important; min-width: 310px !important; }
@@ -627,6 +629,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
