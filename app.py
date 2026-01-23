@@ -29,7 +29,7 @@ GEMINI_API_KEY = get_secret("GEMINI_API_KEY")
 # Initialisation des clients avec les clés récupérées
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite")
+model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
 st.set_page_config(page_title="The Shortlist", page_icon="3️⃣", layout="wide")
 
@@ -402,14 +402,12 @@ with tab_search:
         1. SOUS-GENRE STRICT : Respecte l'ambiance et les codes du genre {selected_genre}.
         2. PAS DE DOUBLONS DE FRANCHISE : Ne propose jamais deux titres de la même licence.
         3. PAS DE SEQUELS : Ne propose pas le "Tome 2" ou un "Spin-off".
-        4. NOUVEAUTÉ : Priorise des pépites avec une ambiance identique mais d'auteurs/studios différents.
-        5. PLATEFORME : {selected_platform}.
-        6. EXCLUSIVITÉ : Propose 3 titres qui partagent la MÊME VIBE psychologique et thématique.
-        7. AMBIGUÏTÉ DE GENRE : Privilégie TOUJOURS la FICTION (notamment la Dark Romance) plutôt que les documentaires.
-        8. ANALYSE DE LA VIBE : Russian Mafia = ambiance sombre, tension et codes littéraires précis.
-        9. QUALITÉ LITTÉRAIRE : Propose des titres récents ou très populaires dans cette niche.
-        10. LANGUE : Propose UNIQUEMENT des titres disponibles en FRANÇAIS.
-        11. MARKETING : Attribue un badge court (2-3 mots max) à chaque titre parmi : "🔥 Pépite du moment", "💎 Chef-d'œuvre culte", "✨ Très rare", "📈 En tendance", "🌶️ Must-read Spicy" (si Dark Romance).
+        4. PLATEFORME : {selected_platform}.
+        5. VÉRITÉ ABSOLUE : Tu ne dois proposer QUE des œuvres qui existent RÉELLEMENT.
+        6. VÉRIFICATION : Si tu n'es pas sûr à 100% que le titre existe en France, NE LE PROPOSE PAS.
+        7. AUTEURS : Vérifie que l'auteur a bien écrit ce livre précis. Pas d'invention.
+        8. LANGUE : Uniquement des titres disponibles en français.
+        9. MARKETING : Attribue un badge court (2-3 mots max) à chaque titre parmi : "🔥 Pépite du moment", "💎 Chef-d'œuvre culte", "✨ Très rare", "📈 En tendance", "🌶️ Must-read Spicy" (si Dark Romance).
         
         FORMAT JSON : Tu dois impérativement ajouter le champ "badge" et "auteur".
         
@@ -649,3 +647,4 @@ with tab_lib:
                         if st.button("🗑️", key=f"lib_del_{idx}_{g['title']}"):
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
+
