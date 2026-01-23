@@ -400,16 +400,18 @@ with tab_search:
         **4. Mode "Surprends-moi"** : En panne d'inspiration ? Laissez l'IA dénicher une pépite méconnue pour vous.
         """)
 
-    # --- LOGIQUE IA (Section 6) ---
+    # --- LOGIQUE IA AVEC CHARGEMENT ANIMÉ (CORRIGÉ) ---
     if st.session_state.last_query and st.session_state.current_recos is None:
         import datetime
+        import time
+        import random
+        from concurrent.futures import ThreadPoolExecutor
+
+        # 1. Préparation des données (Favoris, Exclusions...)
         limit_date = (datetime.datetime.now() - datetime.timedelta(days=14)).isoformat()
-        
-        # Récupération des favoris pour l'IA
         lib = load_data(st.session_state.user_email, app_mode) if st.session_state.user_email else []
         favs = [g['title'] for g in lib if g['rating'] >= 4]
         
-        # Récupération des rejets récents dans Supabase [cite: 2026-01-06]
         historical_dislikes = []
         if st.session_state.user_email:
             try:
@@ -419,7 +421,6 @@ with tab_search:
                 historical_dislikes = [d['item_title'] for d in res_dis.data]
             except: pass
             
-        # On combine tout ce qu'on ne veut pas voir
         exclude_list = list(set(st.session_state.seen_items + historical_dislikes))
         exclude = ", ".join(exclude_list)
         
@@ -460,47 +461,72 @@ with tab_search:
         ]
         """
         
-        # --- NOUVEAU SYSTÈME D'ATTENTE FUN ---
-        import random
-        
-        # 1. On prépare la zone d'affichage
+        # --- DÉBUT DE L'ANIMATION COMPLEXE ---
         loader_placeholder = st.empty()
-        
-        # 2. On choisit une anecdote au hasard selon la catégorie
         current_facts = LOADING_FACTS.get(app_mode, LOADING_FACTS["Autre"])
-        fact = random.choice(current_facts)
         
-        # 3. On affiche le contenu DANS le placeholder
-        with loader_placeholder.container():
-            st.markdown(f"""
-            <div style="background-color: #111827; border: 2px solid #3B82F6; border-radius: 15px; padding: 30px; text-align: center; margin-top: 20px;">
-                <h3 style="color: #3B82F6; font-weight: 900; margin-bottom: 20px;">🤖 L'IA TRAVAILLE...</h3>
-                <img src="https://media.giphy.com/media/l3nWhI38IWDofyDrW/giphy.gif" style="width: 150px; border-radius: 10px; margin-bottom: 20px;">
-                <p style="color: white; font-size: 18px; font-style: italic;">" {fact} "</p>
-                <div style="margin-top: 20px;">
-                    <p style="color: #9CA3AF; font-size: 12px;">Recherche de pépites en cours...</p>
+        # On utilise un Executor pour lancer l'IA sans bloquer l'affichage
+        executor = ThreadPoolExecutor()
+        future = executor.submit(model.generate_content, prompt) # Lancement de l'IA en arrière-plan
+        
+        # BOUCLE D'ANIMATION (Tant que l'IA n'a pas fini)
+        fact_index = 0
+        while not future.done():
+            # On change l'anecdote
+            fact = current_facts[fact_index % len(current_facts)]
+            
+            with loader_placeholder.container():
+                st.markdown(f"""
+                <div style="background-color: #111827; border: 2px solid #3B82F6; border-radius: 15px; padding: 30px; text-align: center; margin-top: 20px; box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);">
+                    <h3 style="color: #3B82F6; font-weight: 900; margin-bottom: 20px; animation: pulse 1.5s infinite;">🧠 L'IA RÉFLÉCHIT...</h3>
+                    <img src="https://media.giphy.com/media/l3nWhI38IWDofyDrW/giphy.gif" style="width: 120px; border-radius: 10px; margin-bottom: 20px; opacity: 0.8;">
+                    <div style="height: 80px; display: flex; align-items: center; justify-content: center;">
+                        <p style="color: white; font-size: 18px; font-style: italic; font-weight: 600;">"{fact}"</p>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <p style="color: #9CA3AF; font-size: 12px;">Recherche des meilleures pépites pour toi...</p>
+                    </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-
+                <style>
+                @keyframes pulse {{ 0% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} 100% {{ opacity: 1; }} }}
+                </style>
+                """, unsafe_allow_html=True)
+            
+            time.sleep(3.5) # On attend 3.5 secondes avant de changer de fait
+            fact_index += 1
+        
+        # --- L'IA A FINI ! ---
         try:
-            # 4. L'IA travaille PENDANT que l'utilisateur lit l'anecdote
-            response = model.generate_content(prompt) # (Ou client_groq selon ce que tu utilises)
+            response = future.result() # On récupère le résultat
             
-            # --- Code de traitement de la réponse (JSON, etc.) ---
-            # ... (Ton code actuel de regex et json.loads va ici) ...
-            # ...
-            # ...
-            
-            # 5. TRES IMPORTANT : On supprime l'écran de chargement avant d'afficher les résultats
-            loader_placeholder.empty() 
-            
-            # 6. On affiche les résultats (Ton code actuel de st.rerun ou d'affichage)
-            # ...
-            
+            # Nettoyage et Parsing JSON
+            json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
+            if json_match:
+                recos = json.loads(json_match.group())
+                
+                # Petit message pour dire "On charge les images..."
+                loader_placeholder.markdown("recherche des images...")
+                
+                # Chargement des images en parallèle
+                with ThreadPoolExecutor(max_workers=3) as img_executor:
+                    titles = [r['titre'] for r in recos]
+                    image_results = list(img_executor.map(lambda t: fetch_image_turbo(t, app_mode), titles))
+                
+                for i, r in enumerate(recos):
+                    r['img'] = image_results[i]
+                
+                # SAUVEGARDE ET RECHARGEMENT
+                st.session_state.current_recos = recos
+                loader_placeholder.empty() # On supprime l'écran de chargement
+                st.rerun() # FORCER LE RECHARGEMENT DE LA PAGE POUR AFFICHER LES RÉSULTATS
+            else:
+                loader_placeholder.error("L'IA a renvoyé un format illisible. Réessaie !")
+                time.sleep(2)
+                st.session_state.current_recos = None
+                st.rerun()
+
         except Exception as e:
-            loader_placeholder.empty() # On efface même en cas d'erreur
-            st.error(f"Erreur IA : {e}")
+            loader_placeholder.error(f"Erreur technique : {e}")
     # --- 6. AFFICHAGE DES RÉSULTATS (Section 6) ---
 if st.session_state.current_recos:
     st.write("---")
@@ -701,6 +727,7 @@ with tab_lib:
                         if st.button("🗑️", key=f"lib_del_{idx}_{g['title']}"):
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
+
 
 
 
