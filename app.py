@@ -20,7 +20,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
 except:
-    api_key = "AIzaSyBT5Af9Zm7_6anwq3OwJdWe1Th99InTNsM" # Uniquement pour tes tests locaux
+    api_key = "" # Uniquement pour tes tests locaux
 
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel(model_name="gemini-2.5-flash") # Version stable et rapide
@@ -573,6 +573,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
