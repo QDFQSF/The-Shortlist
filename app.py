@@ -5,7 +5,7 @@ import json, urllib.parse, re, requests
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
-from groq import Groq
+
 
 # --- 1. CONFIGURATION ---
 AMAZON_PARTNER_ID = "theshorlistap-21"
@@ -573,6 +573,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
