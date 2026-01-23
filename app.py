@@ -40,6 +40,44 @@ if 'current_recos' not in st.session_state: st.session_state.current_recos = Non
 if 'last_query' not in st.session_state: st.session_state.last_query = ""
 
 
+# --- BANQUE D'ANECDOTES POUR LE CHARGEMENT ---
+LOADING_FACTS = {
+    "🎮 Jeux Vidéo": [
+        "Le code Konami (Haut, Haut, Bas, Bas...) existe car le créateur de Gradius trouvait le jeu trop dur !",
+        "Pac-Man a été inspiré par une pizza à laquelle il manquait une part.",
+        "La carte de GTA V fait deux fois la taille de l'île de Manhattan réelle.",
+        "Mario s'appelait à l'origine 'Jumpman' et était charpentier, pas plombier.",
+        "Le jeu 'E.T.' sur Atari a été enterré dans le désert car il était jugé trop mauvais."
+    ],
+    "🎬 Films": [
+        "Le budget marketing du film 'Barbie' était supérieur au budget du film lui-même !",
+        "Dans 'Psychose', le sang dans la douche était en fait du sirop de chocolat.",
+        "Sean Connery portait une perruque dans tous ses films James Bond.",
+        "Le bruit des vélociraptors dans Jurassic Park ? Des tortues en train de s'accoupler.",
+        "Tom Cruise a vraiment escaladé le Burj Khalifa pour Mission Impossible."
+    ],
+    "📺 Séries": [
+        "Les acteurs de 'Friends' gagnaient 1 million de dollars par épisode à la fin.",
+        "Le Trône de Fer de Game of Thrones contient une épée de Gandalf (Seigneur des Anneaux).",
+        "Walter White (Breaking Bad) porte des couleurs de plus en plus sombres à mesure que la série avance.",
+        "Homer Simpson a travaillé dans plus de 188 métiers différents.",
+        "Netflix a été créé parce que le fondateur en avait marre des pénalités de retard de ses DVD."
+    ],
+    "📚 Livres": [
+        "J.K. Rowling a été rejetée par 12 maisons d'édition avant de publier Harry Potter.",
+        "L'odeur des vieux livres a un nom : le 'biblichor'.",
+        "Le livre le plus volé dans les bibliothèques publiques est le Guinness des Records.",
+        "Agatha Christie a écrit ses meilleurs romans en mangeant des pommes dans son bain.",
+        "Il existe un mot pour l'acte de sentir les livres : la 'bibliosmia'."
+    ],
+    # Par défaut pour les autres catégories
+    "Autre": [
+        "L'IA réfléchit... C'est plus long de trouver une pépite que de générer du texte !",
+        "Patience, les meilleures choses ont besoin de temps (comme le bon vin).",
+        "Le saviez-vous ? Les loutres se tiennent la main pour ne pas dériver en dormant."
+    ]
+}
+
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
 
 def get_ai_summary(title, author, mode):
@@ -422,31 +460,47 @@ with tab_search:
         ]
         """
         
-        with st.spinner('L\'IA analyse votre demande...'):
-            try:
-                # 1. Appel à l'IA (Gemini 3 Flash Preview)
-                response = model.generate_content(prompt)
-                json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
-                
-                if json_match:
-                    recos = json.loads(json_match.group())
-                    
-                    # 2. CHARGEMENT PARALLÈLE (VITESSE TURBO)
-                    # On cherche les 3 images en même temps au lieu d'une par une
-                    with ThreadPoolExecutor(max_workers=3) as executor:
-                        titles = [r['titre'] for r in recos]
-                        # On utilise la fonction turbo avec le timeout de 2s
-                        image_results = list(executor.map(lambda t: fetch_image_turbo(t, app_mode), titles))
-                    
-                    for i, r in enumerate(recos):
-                        r['img'] = image_results[i]
-                    
-                    st.session_state.current_recos = recos
-                    st.rerun() 
-                else:
-                    st.error("Erreur de formatage de l'IA. Réessayez.")
-            except Exception as e:
-                st.error(f"Erreur IA : {e}")
+        # --- NOUVEAU SYSTÈME D'ATTENTE FUN ---
+        import random
+        
+        # 1. On prépare la zone d'affichage
+        loader_placeholder = st.empty()
+        
+        # 2. On choisit une anecdote au hasard selon la catégorie
+        current_facts = LOADING_FACTS.get(app_mode, LOADING_FACTS["Autre"])
+        fact = random.choice(current_facts)
+        
+        # 3. On affiche le contenu DANS le placeholder
+        with loader_placeholder.container():
+            st.markdown(f"""
+            <div style="background-color: #111827; border: 2px solid #3B82F6; border-radius: 15px; padding: 30px; text-align: center; margin-top: 20px;">
+                <h3 style="color: #3B82F6; font-weight: 900; margin-bottom: 20px;">🤖 L'IA TRAVAILLE...</h3>
+                <img src="https://media.giphy.com/media/l3nWhI38IWDofyDrW/giphy.gif" style="width: 150px; border-radius: 10px; margin-bottom: 20px;">
+                <p style="color: white; font-size: 18px; font-style: italic;">" {fact} "</p>
+                <div style="margin-top: 20px;">
+                    <p style="color: #9CA3AF; font-size: 12px;">Recherche de pépites en cours...</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        try:
+            # 4. L'IA travaille PENDANT que l'utilisateur lit l'anecdote
+            response = model.generate_content(prompt) # (Ou client_groq selon ce que tu utilises)
+            
+            # --- Code de traitement de la réponse (JSON, etc.) ---
+            # ... (Ton code actuel de regex et json.loads va ici) ...
+            # ...
+            # ...
+            
+            # 5. TRES IMPORTANT : On supprime l'écran de chargement avant d'afficher les résultats
+            loader_placeholder.empty() 
+            
+            # 6. On affiche les résultats (Ton code actuel de st.rerun ou d'affichage)
+            # ...
+            
+        except Exception as e:
+            loader_placeholder.empty() # On efface même en cas d'erreur
+            st.error(f"Erreur IA : {e}")
     # --- 6. AFFICHAGE DES RÉSULTATS (Section 6) ---
 if st.session_state.current_recos:
     st.write("---")
@@ -647,6 +701,7 @@ with tab_lib:
                         if st.button("🗑️", key=f"lib_del_{idx}_{g['title']}"):
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
+
 
 
 
