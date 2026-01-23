@@ -1,6 +1,8 @@
 import streamlit as st
-import google.generativeai as genai
+# import google.generativeai as genai  <-- ON SUPPRIME ÇA
+from groq import Groq # <-- ON AJOUTE ÇA
 import json, urllib.parse, re, requests
+import os
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
@@ -8,8 +10,6 @@ from streamlit.components.v1 import html
 
 # --- FONCTION DE RÉCUPÉRATION SÉCURISÉE ---
 def get_secret(key, default=""):
-    # On cherche d'abord dans st.secrets (Streamlit Cloud)
-    # Puis dans os.environ (Render / Local)
     try:
         return st.secrets[key]
     except:
@@ -18,23 +18,25 @@ def get_secret(key, default=""):
 # --- 1. CONFIGURATION ---
 AMAZON_PARTNER_ID = "theshorlistap-21"
 INSTANT_GAMING_ID = "theshortlistapp"
-# Récupération via la fonction sécurisée
+
+# Récupération des secrets
 SUPABASE_URL = get_secret("SUPABASE_URL")
 SUPABASE_KEY = get_secret("SUPABASE_KEY")
 TMDB_API_KEY = get_secret("TMDB_API_KEY")
+# GEMINI_API_KEY = get_secret("GEMINI_API_KEY") <-- ON SUPPRIME
+GROQ_API_KEY = get_secret("GROQ_API_KEY") # <-- ON AJOUTE (Assure-toi de l'avoir mise dans tes secrets !)
 
+# Initialisation des clients
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-# --- CONFIGURATION SÉCURISÉE ---
-# On essaie de lire les secrets (pour le Web), sinon on prend la valeur locale (pour ton PC)
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-except:
-    api_key = "" # Uniquement pour tes tests locaux
 
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite") # Version stable et rapide
+# INITIALISATION CLIENT GROQ (Llama 3.3)
+client_groq = Groq(api_key=GROQ_API_KEY)
 
-st.set_page_config(page_title="The Shortlist", page_icon="📑", layout="wide")
+# On supprime la config Gemini
+# genai.configure(api_key=GEMINI_API_KEY)
+# model = genai.GenerativeModel(...)
+
+st.set_page_config(page_title="The Shortlist", page_icon="3️⃣", layout="wide")
 
 # INITIALISATION DES ÉTATS
 if 'user_email' not in st.session_state: st.session_state.user_email = None
@@ -46,14 +48,21 @@ if 'last_query' not in st.session_state: st.session_state.last_query = ""
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
 
 def get_ai_summary(title, author, mode):
-    """Génère un résumé flash de 3 lignes maximum [cite: 2026-01-04]"""
-    # On adapte le type de média pour l'IA
+    """Génère un résumé flash de 3 lignes maximum avec Groq"""
     media_type = "jeu vidéo" if mode == "🎮 Jeux Vidéo" else "ouvrage/média"
     prompt = f"Fais un résumé très court (maximum 3 lignes) en français pour ce {media_type} : '{title}' par '{author}'. Style direct et accrocheur."
     
     try:
-        response = model.generate_content(prompt)
-        return response.text
+        # APPEL GROQ (Llama 3.3)
+        completion = client_groq.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=150
+        )
+        return completion.choices[0].message.content
     except:
         return "Résumé indisponible pour le moment."
 
@@ -375,16 +384,15 @@ with tab_search:
         **4. Mode "Surprends-moi"** : En panne d'inspiration ? Laissez l'IA dénicher une pépite méconnue pour vous.
         """)
 
-    # --- LOGIQUE IA (Section 6) ---
+    # --- LOGIQUE IA (Version GROQ TURBO) ---
     if st.session_state.last_query and st.session_state.current_recos is None:
         import datetime
         limit_date = (datetime.datetime.now() - datetime.timedelta(days=14)).isoformat()
         
-        # Récupération des favoris pour l'IA
+        # Récupération des favoris et exclusions (Code existant conservé)
         lib = load_data(st.session_state.user_email, app_mode) if st.session_state.user_email else []
         favs = [g['title'] for g in lib if g['rating'] >= 4]
         
-        # Récupération des rejets récents dans Supabase [cite: 2026-01-06]
         historical_dislikes = []
         if st.session_state.user_email:
             try:
@@ -394,25 +402,22 @@ with tab_search:
                 historical_dislikes = [d['item_title'] for d in res_dis.data]
             except: pass
             
-        # On combine tout ce qu'on ne veut pas voir
         exclude_list = list(set(st.session_state.seen_items + historical_dislikes))
         exclude = ", ".join(exclude_list)
         
-       # Définition dynamique du rôle et du type d'objet [cite: 2026-01-04]
-        role_expert = "un expert en jeux vidéo et culture gaming" if app_mode == "🎮 Jeux Vidéo" else "un bibliothécaire et curateur littéraire d'élite"
-        format_attendu = "jeu vidéo (pas de livres !)" if app_mode == "🎮 Jeux Vidéo" else "ouvrage ou média"
-
+        # Définition du Prompt (Adapté pour Groq JSON Mode)
+        role_expert = "un expert en jeux vidéo" if app_mode == "🎮 Jeux Vidéo" else "un bibliothécaire d'élite"
+        
         prompt = f"""
         RÔLE : Tu es {role_expert}.
         RECHERCHE ACTUELLE : "{st.session_state.last_query}"
         FAVORIS DE L'UTILISATEUR : {favs}
         DÉJÀ VUS/LUS (À EXCLURE) : {exclude}
         STYLE CIBLÉ : {selected_genre}
-
         RÈGLE ZÉRO (CRITIQUE) : La catégorie sélectionnée est {app_mode}. 
         Tu as l'INTERDICTION ABSOLUE de proposer un livre si la catégorie est Jeux Vidéo. 
         Si l'utilisateur cherche "RDR2", propose des jeux similaires (Western, Open World), jamais de romans.
-
+        
        RÈGLES D'OR ABSOLUES :
         1. SOUS-GENRE STRICT : Respecte l'ambiance et les codes du genre {selected_genre}.
         2. PAS DE DOUBLONS DE FRANCHISE : Ne propose jamais deux titres de la même licence.
@@ -439,29 +444,35 @@ with tab_search:
         ]
         """
         
-        with st.spinner('L\'IA analyse votre demande...'):
+        with st.spinner('L\'IA analyse votre demande (Turbo)...'):
             try:
-                # 1. Appel à l'IA (Gemini 3 Flash Preview)
-                response = model.generate_content(prompt)
-                json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
+                # APPEL GROQ (Mode JSON)
+                completion = client_groq.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": "Tu es une API JSON. Tu ne réponds qu'en JSON valide."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.3, # Faible pour éviter les hallucinations
+                    response_format={"type": "json_object"} # FORCE LE JSON
+                )
                 
-                if json_match:
-                    recos = json.loads(json_match.group())
-                    
-                    # 2. CHARGEMENT PARALLÈLE (VITESSE TURBO)
-                    # On cherche les 3 images en même temps au lieu d'une par une
-                    with ThreadPoolExecutor(max_workers=3) as executor:
-                        titles = [r['titre'] for r in recos]
-                        # On utilise la fonction turbo avec le timeout de 2s
-                        image_results = list(executor.map(lambda t: fetch_image_turbo(t, app_mode), titles))
-                    
-                    for i, r in enumerate(recos):
-                        r['img'] = image_results[i]
-                    
-                    st.session_state.current_recos = recos
-                    st.rerun() 
-                else:
-                    st.error("Erreur de formatage de l'IA. Réessayez.")
+                # Parsing direct (Plus besoin de Regex complexe)
+                json_str = completion.choices[0].message.content
+                data = json.loads(json_str)
+                recos = data.get("recommandations", [])
+                
+                # Chargement des images (Code existant conservé)
+                with ThreadPoolExecutor(max_workers=3) as executor:
+                    titles = [r['titre'] for r in recos]
+                    image_results = list(executor.map(lambda t: fetch_image_turbo(t, app_mode), titles))
+                
+                for i, r in enumerate(recos):
+                    r['img'] = image_results[i]
+                
+                st.session_state.current_recos = recos
+                st.rerun()
+                
             except Exception as e:
                 st.error(f"Erreur IA : {e}")
     # --- 6. AFFICHAGE DES RÉSULTATS (Section 6) ---
@@ -527,27 +538,37 @@ if st.session_state.current_recos:
                     """
                     
                     try:
-                        resp = model.generate_content(replace_prompt)
-                        match = re.search(r'\{.*\}', resp.text, re.DOTALL) # On cherche un objet unique {}
-                        if match:
-                            new_data = json.loads(match.group())
-                            # On utilise ta fonction Turbo pour l'image [cite: 2026-01-04]
-                            new_data['img'] = fetch_image_turbo(new_data['titre'], app_mode)
-                            
-                            # Mise à jour de la liste en session
-                            st.session_state.current_recos[i] = new_data
-                            st.rerun()
-                    except Exception as e:
-                        st.toast("⚠️ Petit hoquet de l'IA, réessayez !")
+                    # Prompt simplifié pour Groq
+                    replace_prompt = f"""
+                    CONTEXTE : {app_mode} / {selected_genre}.
+                    EXCLURE : {exclude_updated}.
+                    TÂCHE : Donne-moi 1 SEULE nouvelle recommandation en JSON.
+                    FORMAT : {{ "titre": "...", "auteur": "...", "desc": "..." }}
+                    """
+                    
+                    # Appel Groq pour le remplacement
+                    resp = client_groq.chat.completions.create(
+                        model="llama-3.3-70b-versatile",
+                        messages=[{"role": "user", "content": replace_prompt}],
+                        response_format={"type": "json_object"}
+                    )
+                    
+                    new_data = json.loads(resp.choices[0].message.content)
+                    
+                    # Parfois le JSON mode renvoie { "titre": ... } ou { "recommandation": { "titre": ... } }
+                    # On sécurise un peu si Groq met une clé racine
+                    if "recommandations" in new_data: new_data = new_data["recommandations"][0]
+                    if "recommandation" in new_data: new_data = new_data["recommandation"]
 
-            # 4. Bouton WhatsApp
-            st.markdown(f"""
-                <a href="{whatsapp_url}" target="_blank" style="text-decoration:none;">
-                    <button style="width:100%; background-color:#25D366 !important; color:black; border:none; border-radius:9999px; padding:10px; margin-top:10px; cursor:pointer; font-weight:bold;">
-                        📲 Partager
-                    </button>
-                </a>
-            """, unsafe_allow_html=True)
+                    # Image et Mise à jour
+                    new_data['img'] = fetch_image_turbo(new_data['titre'], app_mode)
+                    st.session_state.current_recos[i] = new_data
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.toast("⚠️ Petit hoquet de l'IA, réessayez !")
+
+        
 
             # 5. Bouton Bibliothèque avec Auteur
             if st.button(f"✅ J'y ai joué/vu", key=f"p_{i}", use_container_width=True):
@@ -665,6 +686,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
