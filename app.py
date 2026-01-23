@@ -370,7 +370,7 @@ with tab_search:
         
         # PROMPT ULTRA-RESTRICTIF POUR ÉVITER LE HORS-SUJET
         prompt = f"""
-        RÔLE : Tu es {role_expert}.
+        RÔLE : Tu es un bibliothécaire et curateur d'élite spécialisé en {app_mode}.
         CONTEXTE : L'utilisateur cherche "{st.session_state.last_query}".
         FAVORIS DE L'UTILISATEUR : {favs}
         DÉJÀ VUS/LUS (À EXCLURE) : {exclude}
@@ -573,6 +573,7 @@ with tab_lib:
                 if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                     st.rerun()
+
 
 
 
