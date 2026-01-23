@@ -29,7 +29,7 @@ GEMINI_API_KEY = get_secret("GEMINI_API_KEY")
 # Initialisation des clients avec les clés récupérées
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite")
+model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
 st.set_page_config(page_title="The Shortlist", page_icon="3️⃣", layout="wide")
 
@@ -647,6 +647,7 @@ with tab_lib:
                         if st.button("🗑️", key=f"lib_del_{idx}_{g['title']}"):
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
+
 
 
 
