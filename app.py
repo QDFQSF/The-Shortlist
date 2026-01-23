@@ -406,9 +406,8 @@ with tab_search:
         5. PLATEFORME : {selected_platform}.
         6. VÉRIFICATION : Si tu n'es pas sûr à 100% que le titre existe en France, NE LE PROPOSE PAS.
         7. AUTEURS : Vérifie que l'auteur a bien écrit ce livre précis. Pas d'invention..
-        9. QUALITÉ LITTÉRAIRE : Propose des titres récents ou très populaires dans cette niche.
-        10. LANGUE : Propose UNIQUEMENT des titres disponibles en FRANÇAIS.
-        11. MARKETING : Attribue un badge court (2-3 mots max) à chaque titre parmi : "🔥 Pépite du moment", "💎 Chef-d'œuvre culte", "✨ Très rare", "📈 En tendance", "🌶️ Must-read Spicy" (si Dark Romance).
+        8. LANGUE : Propose UNIQUEMENT des titres disponibles en FRANÇAIS.
+        9. MARKETING : Attribue un badge court (2-3 mots max) à chaque titre parmi : "🔥 Pépite du moment", "💎 Chef-d'œuvre culte", "✨ Très rare", "📈 En tendance", "🌶️ Must-read Spicy" (si Dark Romance).
         
         FORMAT JSON : Tu dois impérativement ajouter le champ "badge" et "auteur".
         
@@ -648,4 +647,5 @@ with tab_lib:
                         if st.button("🗑️", key=f"lib_del_{idx}_{g['title']}"):
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
+
 
