@@ -208,6 +208,31 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0, 112, 186, 0.4);
     }
 
+
+    /* 2. CRÉATION DE LA BULLE D'AIDE (LE TEXTE AVEC FLÈCHE) */
+    /* Ce bloc crée un élément visuel fixe que Streamlit ne peut pas cacher */
+    [data-testid="stAppViewContainer"]::before {
+        content: "⬅️ CLIQUEZ ICI POUR LE MENU";
+        position: fixed;
+        top: 15px;
+        left: 360px; /* Placé juste à côté du bouton */
+        background-color: #3B82F6;
+        color: white;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        font-weight: 800;
+        z-index: 9999999;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        animation: bounce 2s infinite;
+    }
+
+    /* Animation de rebond pour attirer l'oeil */
+    @keyframes bounce {
+        0%, 100% { transform: translateX(0); }
+        50% { transform: translateX(10px); }
+    }
+
     /* --- LOGO --- */
     .logo-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 25px; }
     .logo-icon {
@@ -640,6 +665,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
