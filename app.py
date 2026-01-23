@@ -1,31 +1,37 @@
-
 import streamlit as st
 import google.generativeai as genai
 import json, urllib.parse, re, requests
+import os
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
+from streamlit.components.v1 import html
 
+# --- FONCTION DE RÉCUPÉRATION SÉCURISÉE ---
+def get_secret(key, default=""):
+    try:
+        # On tente d'abord les secrets Streamlit
+        return st.secrets[key]
+    except:
+        # Sinon on prend les variables d'environnement (Hugging Face)
+        return os.environ.get(key, default)
 
 # --- 1. CONFIGURATION ---
 AMAZON_PARTNER_ID = "theshorlistap-21"
 INSTANT_GAMING_ID = "theshortlistapp"
-SUPABASE_URL = "https://enkgnmxqvnpvqceueayg.supabase.co"
-SUPABASE_KEY = "sb_secret_mNz02Qr2x9SnGMqIPtxRaw_GUK0f9Hd"
-TMDB_API_KEY = "53f9c070d843a78f4f16579e57bdda32" 
 
+# Récupération des secrets configurés dans Hugging Face
+SUPABASE_URL = get_secret("SUPABASE_URL")
+SUPABASE_KEY = get_secret("SUPABASE_KEY")
+TMDB_API_KEY = get_secret("TMDB_API_KEY")
+GEMINI_API_KEY = get_secret("GEMINI_API_KEY")
+
+# Initialisation des clients avec les clés récupérées
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-# --- CONFIGURATION SÉCURISÉE ---
-# On essaie de lire les secrets (pour le Web), sinon on prend la valeur locale (pour ton PC)
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-except:
-    api_key = "" # Uniquement pour tes tests locaux
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite")
 
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel(model_name="gemini-2.5-flash") # Version stable et rapide
-
-st.set_page_config(page_title="The Shortlist", page_icon="📑", layout="wide")
+st.set_page_config(page_title="The Shortlist", page_icon="3️⃣", layout="wide")
 
 # INITIALISATION DES ÉTATS
 if 'user_email' not in st.session_state: st.session_state.user_email = None
@@ -33,18 +39,32 @@ if 'seen_items' not in st.session_state: st.session_state.seen_items = []
 if 'current_recos' not in st.session_state: st.session_state.current_recos = None
 if 'last_query' not in st.session_state: st.session_state.last_query = ""
 
+
 # --- 2. FONCTIONS DE BASE DE DONNÉES (CORRIGÉES) ---
 
-def load_data(email, mode):
-    """Charge les données en incluant le statut favori [cite: 2026-01-06]"""
+def get_ai_summary(title, author, mode):
+    """Génère un résumé flash de 3 lignes maximum [cite: 2026-01-04]"""
+    # On adapte le type de média pour l'IA
+    media_type = "jeu vidéo" if mode == "🎮 Jeux Vidéo" else "ouvrage/média"
+    prompt = f"Fais un résumé très court (maximum 3 lignes) en français pour ce {media_type} : '{title}' par '{author}'. Style direct et accrocheur."
+    
     try:
-        if mode == "🎮 Jeux Vidéo":
-            res = supabase.table("user_library").select("game_title, rating, is_favorite").eq("user_email", email).execute()
-            return [{'title': d['game_title'], 'rating': d['rating'], 'fav': d.get('is_favorite', False)} for d in res.data]
-        else:
-            res = supabase.table("user_media").select("title, rating, is_favorite").eq("user_email", email).eq("category", mode).execute()
-            return [{'title': d['title'], 'rating': d['rating'], 'fav': d.get('is_favorite', False)} for d in res.data]
-    except: return []
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "Résumé indisponible pour le moment."
+
+def save_rejection(email, title, mode):
+    """Enregistre un rejet avec la date actuelle [cite: 2026-01-06]"""
+    if email:
+        try:
+            supabase.table("user_dislikes").insert({
+                "user_email": email, 
+                "item_title": title, 
+                "category": mode
+            }).execute()
+        except: pass
+
 
 def toggle_favorite_db(email, mode, title, current_status):
     """Bascule le statut favori (All-time) [cite: 2026-01-06]"""
@@ -54,20 +74,31 @@ def toggle_favorite_db(email, mode, title, current_status):
     else:
         supabase.table("user_media").update({"is_favorite": new_status}).eq("user_email", email).eq("title", title).eq("category", mode).execute()
 
-def save_item(email, mode, title):
-    """Enregistre le titre proprement selon le mode [cite: 2026-01-06]"""
+def load_data(email, mode):
+    """Charge les données incluant l'auteur/studio [cite: 2026-01-06]"""
+    try:
+        if mode == "🎮 Jeux Vidéo":
+            res = supabase.table("user_library").select("game_title, game_studio, rating, is_favorite").eq("user_email", email).execute()
+            return [{'title': d['game_title'], 'author': d.get('game_studio', ''), 'rating': d['rating'], 'fav': d.get('is_favorite', False)} for d in res.data]
+        else:
+            res = supabase.table("user_media").select("title, author, rating, is_favorite").eq("user_email", email).eq("category", mode).execute()
+            return [{'title': d['title'], 'author': d.get('author', ''), 'rating': d['rating'], 'fav': d.get('is_favorite', False)} for d in res.data]
+    except: return []
+
+def save_item(email, mode, title, author):
+    """Enregistre le titre et l'auteur proprement [cite: 2026-01-06]"""
     if mode == "🎮 Jeux Vidéo":
-        # Pour les jeux, on n'envoie PAS de catégorie
         supabase.table("user_library").insert({
             "user_email": email, 
-            "game_title": title, 
+            "game_title": title,
+            "game_studio": author,
             "rating": 0
         }).execute()
     else:
-        # Pour le reste, on précise la catégorie (Film, Livre, etc.) [cite: 2026-01-06]
         supabase.table("user_media").insert({
             "user_email": email, 
             "title": title, 
+            "author": author,
             "category": mode, 
             "rating": 0
         }).execute()
@@ -87,74 +118,52 @@ def delete_item_db(email, mode, title):
 # --- 3. RÉCUPÉRATION DES IMAGES (HD & PRO) ---
 
 @lru_cache(maxsize=128)
-def fetch_image_hd(title, mode):
-    """Récupère des images haute définition via des APIs spécialisées"""
+def fetch_image_turbo(title, mode):
+    """Version rapide : Timeout réduit et APIs simplifiées"""
     try:
+        # On réduit le timeout à 2s. Si l'API ne répond pas, on passe à la suite.
+        t_out = 2 
+        
         if mode == "🎮 Jeux Vidéo":
             url = f"https://api.rawg.io/api/games?key=aaa189410c114919ab95e6a90ada62f1&search={urllib.parse.quote(title)}&page_size=1"
-            r = requests.get(url, timeout=5).json()
+            r = requests.get(url, timeout=t_out).json()
             return r['results'][0]['background_image'] if r.get('results') else None
 
         elif mode in ["🎬 Films", "📺 Séries"]:
             stype = "tv" if mode == "📺 Séries" else "movie"
             url = f"https://api.themoviedb.org/3/search/{stype}?api_key={TMDB_API_KEY}&query={urllib.parse.quote(title)}"
-            r = requests.get(url).json()
+            r = requests.get(url, timeout=t_out).json()
             if r.get('results') and r['results'][0].get('poster_path'):
-                return f"https://image.tmdb.org/t/p/w500{r['results'][0]['poster_path']}"
+                return f"https://image.tmdb.org/t/p/w300{r['results'][0]['poster_path']}"
 
+        elif mode == "📚 Livres":
+            # Open Library est souvent plus rapide que Google Books pour les couvertures
+            url = f"https://openlibrary.org/search.json?title={urllib.parse.quote(title)}&limit=1"
+            r = requests.get(url, timeout=t_out).json()
+            if r.get('docs') and r['docs'][0].get('cover_i'):
+                return f"https://covers.openlibrary.org/b/id/{r['docs'][0]['cover_i']}-M.jpg"
+            
         elif mode in ["🧧 Animés", "🎋 Mangas"]:
-            # Jikan API pour des affiches d'animés HD
             mtype = "manga" if mode == "🎋 Mangas" else "anime"
             url = f"https://api.jikan.moe/v4/{mtype}?q={urllib.parse.quote(title)}&limit=1"
-            r = requests.get(url).json()
-            if r.get('data'):
-                return r['data'][0]['images']['jpg']['large_image_url']
+            r = requests.get(url, timeout=t_out).json()
+            return r['data'][0]['images']['jpg']['image_url'] if r.get('data') else None
 
-        # --- LIVRES (GOOGLE BOOKS AVEC HD HACK) ---
-        elif mode == "📚 Livres":
-            # On tente Google Books avec forçage de résolution
-            url = f"https://www.googleapis.com/books/v1/volumes?q={urllib.parse.quote(title)}&maxResults=1"
-            r = requests.get(url, timeout=5).json()
-            if r.get('items'):
-                volume_info = r['items'][0]['volumeInfo']
-                img_links = volume_info.get('imageLinks', {})
-                # On cherche la plus grande taille disponible
-                img = img_links.get('extraLarge') or img_links.get('large') or img_links.get('medium') or img_links.get('thumbnail')
-                
-                if img:
-                    # HD HACK : On force le HTTPS, on enlève les bords 'curl' et on booste le zoom
-                    img = img.replace("http://", "https://")
-                    img = img.replace("&edge=curl", "") 
-                    img = img.replace("zoom=1", "zoom=3") 
-                    return img
-            
-            # FALLBACK : Open Library HD
-            url = f"https://openlibrary.org/search.json?title={urllib.parse.quote(title)}&limit=1"
-            r = requests.get(url).json()
-            if r.get('docs') and r['docs'][0].get('cover_i'):
-                return f"https://covers.openlibrary.org/b/id/{r['docs'][0]['cover_i']}-L.jpg"
     except: pass
-    return None
+    return "https://placehold.co/400x600?text=Image+indisponible"
 
 def get_all_images_parallel(titles, mode):
     with ThreadPoolExecutor() as executor:
         return list(executor.map(lambda t: fetch_image_hd(t, mode), titles))
 
-def get_smart_link(title, mode):
-    """Lien d'affiliation Instant Gaming corrigé avec le slash obligatoire"""
-    # quote_plus transforme les espaces en '+' pour le moteur de recherche
-    query = urllib.parse.quote_plus(title)
+def get_smart_link(title, author, mode):
+    """Génère un lien Amazon ultra-précis pour TOUTES les catégories"""
+    # On combine toujours Titre + Auteur/Studio pour éviter les erreurs de recherche
+    search_query = f"{title} {author}" if author else title
+    query_encoded = urllib.parse.quote(search_query)
     
-    # 🎮 JEUX VIDÉO : Note bien le "/" AVANT le "?" c'est lui qui évite le 404
-    if mode == "🎮 Jeux Vidéo":
-        return f"https://www.instant-gaming.com/fr/recherche/?q={query}&igr=theshortlistapp"
-    
-    # Reste du code Amazon (qui est déjà bon selon tes tests)
-    query_amazon = urllib.parse.quote(title)
-    if mode in ["📚 Livres", "🎋 Mangas", "🎬 Films", "📺 Séries"]:
-        return f"https://www.amazon.fr/s?k={query_amazon}&tag=theshorlistap-21"
-    
-    return f"https://www.google.com/search?q={query_amazon}"
+    # On utilise votre identifiant Amazon unique pour tout le monde
+    return f"https://www.amazon.fr/s?k={query_encoded}&tag={AMAZON_PARTNER_ID}"
 
 # --- 4. DESIGN (STYLE PREMIUM & HAUTE VISIBILITÉ) ---
 st.markdown("""
@@ -164,13 +173,10 @@ st.markdown("""
     html, body, [data-testid="stAppViewContainer"] {
         background-color: #0B1120 !important; color: #FFFFFF; font-family: 'Inter', sans-serif;
     }
-
-
     /* Masque le lien "Hosted with Streamlit" en bas à droite */
     a[href*="streamlit.io"] {
         display: none !important;
     }
-
     /* --- SIDEBAR (MENU) : TEXTES BLANCS --- */
     [data-testid="stSidebar"] { background-color: #111827 !important; min-width: 310px !important; }
     [data-testid="stSidebar"] h1 { font-size: 34px !important; color: #3B82F6 !important; font-weight: 900 !important; text-transform: uppercase; }
@@ -180,7 +186,6 @@ st.markdown("""
     [data-testid="stSidebar"] .stRadio div[role="radiogroup"] label p {
         font-size: 20px !important; color: #FFFFFF !important; font-weight: 700 !important;
     }
-
     /* --- CARTES D'OFFRES & PAYPAL --- */
     .deal-card {
         background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.4);
@@ -195,8 +200,6 @@ st.markdown("""
         text-align: center; font-weight: 800; display: block; text-decoration: none;
         box-shadow: 0 4px 15px rgba(0, 112, 186, 0.4);
     }
-
-
     /* 2. CRÉATION DE LA BULLE D'AIDE (LE TEXTE AVEC FLÈCHE) */
     /* Ce bloc crée un élément visuel fixe que Streamlit ne peut pas cacher */
     [data-testid="stAppViewContainer"]::before {
@@ -214,13 +217,11 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         animation: bounce 2s infinite;
     }
-
     /* Animation de rebond pour attirer l'oeil */
     @keyframes bounce {
         0%, 100% { transform: translateX(0); }
         50% { transform: translateX(10px); }
     }
-
     /* --- LOGO --- */
     .logo-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 25px; }
     .logo-icon {
@@ -229,7 +230,6 @@ st.markdown("""
         display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 28px; color: white;
     }
     .logo-text { font-size: 28px; font-weight: 900; color: white; }
-
     /* --- ONGLETS (TABS) : PLUS DE CADRES MOCHES --- */
     button[data-baseweb="tab"] {
         background-color: transparent !important; border: none !important;
@@ -253,10 +253,10 @@ st.markdown("""
         font-weight: 800 !important; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
         box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3) !important;
     }
-
      footer {display: none !important;} [data-testid="stHeader"] {background: transparent !important;}
     </style>
 """, unsafe_allow_html=True)
+
 # --- 5. SIDEBAR (UN SEUL BLOC SANS DOUBLONS) ---
 with st.sidebar:
     st.markdown('<h1 style="color:#3B82F6; font-size:34px; font-weight:900; margin-bottom:20px;">MENU</h1>', unsafe_allow_html=True)
@@ -364,67 +364,90 @@ with tab_search:
 
     # --- LOGIQUE IA (Section 6) ---
     if st.session_state.last_query and st.session_state.current_recos is None:
+        import datetime
+        limit_date = (datetime.datetime.now() - datetime.timedelta(days=14)).isoformat()
+        
+        # Récupération des favoris pour l'IA
         lib = load_data(st.session_state.user_email, app_mode) if st.session_state.user_email else []
         favs = [g['title'] for g in lib if g['rating'] >= 4]
-        exclude = ", ".join(st.session_state.seen_items)
         
-        # PROMPT ULTRA-RESTRICTIF POUR ÉVITER LE HORS-SUJET
+        # Récupération des rejets récents dans Supabase [cite: 2026-01-06]
+        historical_dislikes = []
+        if st.session_state.user_email:
+            try:
+                res_dis = supabase.table("user_dislikes").select("item_title")\
+                    .eq("user_email", st.session_state.user_email)\
+                    .gt("created_at", limit_date).execute()
+                historical_dislikes = [d['item_title'] for d in res_dis.data]
+            except: pass
+            
+        # On combine tout ce qu'on ne veut pas voir
+        exclude_list = list(set(st.session_state.seen_items + historical_dislikes))
+        exclude = ", ".join(exclude_list)
+        
+       # Définition dynamique du rôle et du type d'objet [cite: 2026-01-04]
+        role_expert = "un expert en jeux vidéo et culture gaming" if app_mode == "🎮 Jeux Vidéo" else "un bibliothécaire et curateur littéraire d'élite"
+        format_attendu = "jeu vidéo (pas de livres !)" if app_mode == "🎮 Jeux Vidéo" else "ouvrage ou média"
+
         prompt = f"""
-        RÔLE : Tu es un bibliothécaire et curateur d'élite spécialisé en {app_mode}.
-        CONTEXTE : L'utilisateur cherche "{st.session_state.last_query}".
+        RÔLE : Tu es {role_expert}.
+        RECHERCHE ACTUELLE : "{st.session_state.last_query}"
         FAVORIS DE L'UTILISATEUR : {favs}
         DÉJÀ VUS/LUS (À EXCLURE) : {exclude}
         STYLE CIBLÉ : {selected_genre}
+        RÈGLE ZÉRO (CRITIQUE) : La catégorie sélectionnée est {app_mode}. 
+        Tu as l'INTERDICTION ABSOLUE de proposer un livre si la catégorie est Jeux Vidéo. 
         
-        RÈGLES DE SÉCURITÉ CRITIQUES (ANTI-HALLUCINATION) :
-        1. VÉRITÉ ABSOLUE : Tu ne dois proposer QUE des œuvres qui existent RÉELLEMENT.
-        2. VÉRIFICATION : Si tu n'es pas sûr à 100% que le titre existe en France, NE LE PROPOSE PAS.
-        3. AUTEURS : Vérifie que l'auteur a bien écrit ce livre précis. Pas d'invention.
-        4. LANGUE : Uniquement des titres disponibles en français.
-
-        RÈGLES D'OR ABSOLUES :
-        1. SOUS-GENRE STRICT : Si la recherche ou les favoris indiquent un genre précis (ex: Dark Romance, Soulslike, Seinen), tu as INTERDICTION de proposer un autre genre. Un fan de Dark Romance ne veut pas de livres de mathématiques ou de fantaisie classique.
-        2. PAS DE DOUBLONS DE FRANCHISE : Ne propose JAMAIS deux titres de la même licence ou du même univers. (Ex: Si tu proposes un Naruto, les deux autres doivent être des mangas TOTALEMENT DIFFÉRENTS).
-        3. PAS DE SEQUELS : Ne propose pas le "Tome 2" ou un "Spin-off" d'un titre déjà connu ou présent dans la liste.
-        4. NOUVEAUTÉ : Priorise des pépites avec une ambiance identique mais d'auteurs/studios différents.
+       RÈGLES D'OR ABSOLUES :
+        1. SOUS-GENRE STRICT : Respecte l'ambiance et les codes du genre {selected_genre}.
+        2. PAS DE DOUBLONS DE FRANCHISE : Ne propose jamais deux titres de la même licence.
+        3. PAS DE SEQUELS : Ne propose pas le "Tome 2" ou un "Spin-off".
+        4. VÉRITÉ ABSOLUE : Tu ne dois proposer QUE des œuvres qui existent RÉELLEMENT.
         5. PLATEFORME : {selected_platform}.
-        6. FORMAT : Réponds uniquement en JSON avec "titre" et "desc".
-
-        RÈGLES DE RECOMMANDATION :
-        1. Cible : {app_mode} uniquement. (Si Jeux Vidéo : PAS DE LIVRES).
-        2. Diversité : Pas de doublons avec {exclude}. Pas deux fois la même licence.
-        3. Badge : Ajoute un badge court (ex: "Culte", "Incontournable", "Avis : 4.8/5").
+        6. VÉRIFICATION : Si tu n'es pas sûr à 100% que le titre existe en France, NE LE PROPOSE PAS.
+        7. AUTEURS : Vérifie que l'auteur a bien écrit ce livre précis. Pas d'invention..
+        9. QUALITÉ LITTÉRAIRE : Propose des titres récents ou très populaires dans cette niche.
+        10. LANGUE : Propose UNIQUEMENT des titres disponibles en FRANÇAIS.
+        11. MARKETING : Attribue un badge court (2-3 mots max) à chaque titre parmi : "🔥 Pépite du moment", "💎 Chef-d'œuvre culte", "✨ Très rare", "📈 En tendance", "🌶️ Must-read Spicy" (si Dark Romance).
         
-        FORMAT DE RÉPONSE (JSON PUR) :
-        {{
-            "recommandations": [
-                {{
-                    "titre": "Titre exact officiel",
-                    "auteur": "Auteur exact",
-                    "badge": "Badge court",
-                    "desc": "Pourquoi ce choix en 1 phrase."
-                }}
-            ]
+        FORMAT JSON : Tu dois impérativement ajouter le champ "badge" et "auteur".
+        
+        RÉPONDS UNIQUEMENT AU FORMAT JSON SUIVANT :
+        [
+          {{
+            "titre": "Nom exact",
+            "auteur": "Nom de l'auteur ou du studio",
+            "badge": "Le badge choisi",
+            "desc": "Pourquoi c'est le choix parfait."
+          }}
+        ]
         """
         
-        with st.spinner('L\'IA filtre les pépites pour vous...'):
+        with st.spinner('L\'IA analyse votre demande...'):
             try:
-                # On force Gemini à ne pas sortir du cadre JSON
+                # 1. Appel à l'IA (Gemini 3 Flash Preview)
                 response = model.generate_content(prompt)
                 json_match = re.search(r'\[.*\]', response.text, re.DOTALL)
                 
                 if json_match:
                     recos = json.loads(json_match.group())
-                    # Booster de vitesse : Chargement parallèle des images
-                    imgs = get_all_images_parallel([r['titre'] for r in recos], app_mode)
-                    for i, r in enumerate(recos): 
-                        r['img'] = imgs[i]
+                    
+                    # 2. CHARGEMENT PARALLÈLE (VITESSE TURBO)
+                    # On cherche les 3 images en même temps au lieu d'une par une
+                    with ThreadPoolExecutor(max_workers=3) as executor:
+                        titles = [r['titre'] for r in recos]
+                        # On utilise la fonction turbo avec le timeout de 2s
+                        image_results = list(executor.map(lambda t: fetch_image_turbo(t, app_mode), titles))
+                    
+                    for i, r in enumerate(recos):
+                        r['img'] = image_results[i]
+                    
                     st.session_state.current_recos = recos
+                    st.rerun() 
                 else:
                     st.error("Erreur de formatage de l'IA. Réessayez.")
             except Exception as e:
                 st.error(f"Erreur IA : {e}")
-
     # --- 6. AFFICHAGE DES RÉSULTATS (Section 6) ---
 if st.session_state.current_recos:
     st.write("---")
@@ -436,20 +459,26 @@ if st.session_state.current_recos:
     for i, item in enumerate(st.session_state.current_recos):
         with cols[i]:
             # 1. Génération des liens [cite: 2026-01-04]
-            affiliate_link = get_smart_link(item['titre'], app_mode)
+            auteur_item = item.get('auteur', '')
+            affiliate_link = get_smart_link(item['titre'], auteur_item, app_mode)
             share_text = f"Regarde ce que The Shortlist m'a déniché : {item['titre']} ! {affiliate_link}"
             whatsapp_url = f"https://wa.me/?text={urllib.parse.quote(share_text)}"
             img_url = item['img'] if item['img'] else "https://placehold.co/400x600"
             
-            # 2. Affichage de la Carte [cite: 2026-01-06]
+           # --- AFFICHAGE DE LA CARTE ---
+            badge_text = item.get('badge', '⭐ Sélection')
             st.markdown(f"""
-                <div class="game-card">
-                    <div>
-                        <img src="{img_url}" style="width:100%; height:250px; object-fit:cover; border-radius:15px;">
-                        <div style="font-weight:800; margin-top:15px; font-size:1.1rem;">{item['titre']}</div>
-                        <div style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-top:10px;">{item['desc']}</div>
+                <div class="game-card" style="position: relative; background: rgba(255,255,255,0.05); padding: 20px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+                    <div style="position: absolute; top: 10px; right: 10px; background: #3B82F6; color: white; padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 900; z-index: 10;">
+                        {badge_text}
                     </div>
-                    <a href="{affiliate_link}" target="_blank" class="price-action">🛒 Voir le prix</a>
+                    <img src="{img_url}" style="width:100%; height:250px; object-fit:cover; border-radius:15px;">
+                    <div style="font-weight:800; margin-top:15px; font-size:1.1rem; color:white;">{item['titre']}</div>
+                    <div style="color:#3B82F6; font-size:0.8rem; font-weight:700;">{item.get('auteur', '')}</div>
+                    <div style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-top:10px; height: 60px; overflow: hidden;">{item['desc']}</div>
+                    <a href="{affiliate_link}" target="_blank" style="display: block; text-align: center; background: #FF9900; color: black; text-decoration: none; padding: 12px; border-radius: 12px; margin-top: 15px; font-weight: 800; font-size: 0.9rem;">
+                        🛒 VOIR SUR AMAZON
+                    </a>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -458,45 +487,57 @@ if st.session_state.current_recos:
                 # On peut ici afficher un texte récupéré de l'API ou demander à l'IA d'en générer un court
                 st.write(f"Découvrez l'univers de **{item['titre']}**. Un choix incontournable pour les amateurs du genre.")
                 # Lien "En savoir plus" dynamique
-                more_info_url = f"https://www.google.com/search?q={urllib.parse.quote(item['titre'] + ' synopsis')}"
+                synopsis_query = f"{item['titre']} {auteur_item} synopsis français"
+                more_info_url = f"https://www.google.com/search?q={urllib.parse.quote(synopsis_query)}"
                 st.markdown(f"[🔍 En savoir plus]({more_info_url})")
 
-            # 4. LE BOUTON DE REJET (FIXÉ)
+            
             if st.button(f"❌ Pas pour moi", key=f"rej_{i}", use_container_width=True):
+                # 1. On enregistre le rejet dans Supabase [cite: 2026-01-06]
+                save_rejection(st.session_state.user_email, item['titre'], app_mode)
+                
+                # 2. On l'ajoute à la session actuelle
                 st.session_state.seen_items.append(item['titre'])
                 
-                with st.spinner("Remplacement..."):
+                with st.spinner("Recherche d'une autre pépite..."):
                     exclude_updated = ", ".join(st.session_state.seen_items)
-                    # Prompt de remplacement ultra-contextuel
+                    
+                    # On reprend tes règles d'or pour ne pas perdre en qualité [cite: 2026-01-04]
                     replace_prompt = f"""
-                    RÔLE : Curateur expert en {app_mode}.
-                    CONTEXTE : {current_context} (TRÈS IMPORTANT : respecter strictement ce genre/style).
-                    RECHERCHE ORIGINALE : "{st.session_state.last_query}"
-                    EXCLURE : {exclude_updated}
-                    MISSION : Propose 1 SEULE nouvelle pépite.
-                    FORMAT JSON : [{{"titre": "...", "desc": "...", "synopsis": "..."}}]
+                    RÔLE : Curateur expert en {app_mode} ({selected_genre}).
+                    MISSION : Propose 1 SEULE nouvelle pépite différente de : {exclude_updated}.
+                    RÈGLES : Français uniquement, pas de sequels, pas de doublons.
+                    FORMAT JSON : {{"titre": "...", "auteur": "...", "desc": "..."}}
                     """
                     
                     try:
                         resp = model.generate_content(replace_prompt)
-                        match = re.search(r'\[.*\]', resp.text, re.DOTALL)
+                        match = re.search(r'\{.*\}', resp.text, re.DOTALL) # On cherche un objet unique {}
                         if match:
-                            new_data = json.loads(match.group())[0]
-                            # On récupère l'image en HD
-                            new_data['img'] = fetch_image_hd(new_data['titre'], app_mode)
+                            new_data = json.loads(match.group())
+                            # On utilise ta fonction Turbo pour l'image [cite: 2026-01-04]
+                            new_data['img'] = fetch_image_turbo(new_data['titre'], app_mode)
                             
-                            # MISE À JOUR CHIRURGICALE DE LA LISTE
+                            # Mise à jour de la liste en session
                             st.session_state.current_recos[i] = new_data
                             st.rerun()
                     except Exception as e:
-                        st.toast("⚠️ L'IA a eu un petit hoquet, réessayez !")
+                        st.toast("⚠️ Petit hoquet de l'IA, réessayez !")
 
-        
+            # 4. Bouton WhatsApp
+            st.markdown(f"""
+                <a href="{whatsapp_url}" target="_blank" style="text-decoration:none;">
+                    <button style="width:100%; background-color:#25D366 !important; color:black; border:none; border-radius:9999px; padding:10px; margin-top:10px; cursor:pointer; font-weight:bold;">
+                        📲 Partager
+                    </button>
+                </a>
+            """, unsafe_allow_html=True)
 
-            # 5. Bouton Bibliothèque
+            # 5. Bouton Bibliothèque avec Auteur
             if st.button(f"✅ J'y ai joué/vu", key=f"p_{i}", use_container_width=True):
                 if st.session_state.user_email:
-                    save_item(st.session_state.user_email, app_mode, item['titre'])
+                    # On passe bien item['auteur'] récupéré par l'IA [cite: 2026-01-04]
+                    save_item(st.session_state.user_email, app_mode, item['titre'], item.get('auteur', ''))
                 st.session_state.seen_items.append(item['titre'])
                 st.session_state.current_recos = None
                 st.rerun()
@@ -512,81 +553,98 @@ if st.session_state.current_recos:
             st.rerun()
 
 
-# --- TAB BIBLIOTHÈQUE (Section 7) ---
+# --- TAB BIBLIOTHÈQUE (Section 7 Optimisée) ---
 with tab_lib:
     if not st.session_state.user_email:
-        st.info("Connecte-toi pour voir ta collection.")
+        st.info("Connectez-vous pour voir votre collection personnelle.")
     else:
+        # 1. Chargement des données
         full_data = load_data(st.session_state.user_email, app_mode)
+
+        # --- DASHBOARD DE STATS ---
+        st.markdown('<p style="font-size:26px; font-weight:900; color:#3B82F6;">📊 MES STATS</p>', unsafe_allow_html=True)
         
-        # --- 1. MES FAVORIS ABSOLUS (TOP 5 ALL-TIME) ---
-        st.subheader(f"❤️ Mes Favoris Absolus")
-        # On filtre uniquement ceux qui ont is_favorite = True
+        # Calculs simples
+        total_items = len(full_data)
+        fav_count = len([g for g in full_data if g.get('fav')])
+        avg_rating = sum([g['rating'] for g in full_data]) / total_items if total_items > 0 else 0
+        
+        c_stat1, c_stat2, c_stat3 = st.columns(3)
+        with c_stat1:
+            st.metric("Titres dans ma liste", total_items)
+        with c_stat2:
+            st.metric("Coups de cœur ❤️", fav_count)
+        with c_stat3:
+            st.metric("Note moyenne ⭐", f"{avg_rating:.1f}/5")
+        
+        st.write("---")
+        
+        # --- TOP SECTION : FAVORIS ---
+        st.markdown('<p style="font-size:26px; font-weight:900; color:#FF3366; margin-bottom:20px;">❤️ MES COUPS DE CŒUR</p>', unsafe_allow_html=True)
         absolute_favs = [g for g in full_data if g.get('fav')]
         
         if absolute_favs:
-            f_cols = st.columns(5)
-            for idx, g in enumerate(absolute_favs[:5]): # Limite aux 5 premiers
-                with f_cols[idx]:
+            fav_cols = st.columns(5)
+            for idx, g in enumerate(absolute_favs[:5]):
+                with fav_cols[idx]:
+                    # On récupère l'image en cache pour la rapidité
+                    img_fav = fetch_image_turbo(g['title'], app_mode)
                     st.markdown(f"""
-                        <div style="text-align:center; padding:10px; background:rgba(255,51,102,0.1); border:1px solid #FF3366; border-radius:12px; margin-bottom:10px;">
-                            <div style="font-size:1.2rem;">❤️</div>
-                            <strong style="font-size:0.9rem;">{g['title']}</strong>
+                        <div style="text-align:center; margin-bottom:20px;">
+                            <img src="{img_fav}" style="width:100%; height:140px; object-fit:cover; border-radius:10px; border:2px solid #FF3366;">
+                            <div style="font-weight:800; font-size:0.8rem; margin-top:5px; color:white; height:35px; overflow:hidden;">{g['title']}</div>
                         </div>
                     """, unsafe_allow_html=True)
         else:
-            st.info("Clique sur le ❤️ à côté d'un titre pour l'épingler ici comme favori absolu !")
+            st.caption("Aucun coup de cœur pour le moment. Cliquez sur le ❤️ dans votre liste !")
 
         st.write("---")
 
-        # --- 2. TOP 10 PAR NOTE ---
-        st.subheader(f"🏆 Mon Top 10 par Note")
-        top_items = sorted([g for g in full_data if g['rating'] > 0], key=lambda x: x['rating'], reverse=True)[:10]
-        if top_items:
-            t_cols = st.columns(5)
-            for idx, g in enumerate(top_items):
-                with t_cols[idx % 5]:
-                    st.markdown(f"""<div class="top-badge"><div style="color:#3B82F6; font-weight:800;">#{idx+1}</div><strong>{g['title']}</strong><br>⭐ {g['rating']}/5</div>""", unsafe_allow_html=True)
+        # --- SECTION : MA COLLECTION ---
+        st.markdown('<p style="font-size:26px; font-weight:900; color:#3B82F6; margin-bottom:20px;">📚 MA COLLECTION</p>', unsafe_allow_html=True)
         
-        st.write("---")
-        
-        # --- 3. LISTE COMPLÈTE AVEC OPTION FAVORIS ---
-        search = st.text_input("🔍 Rechercher dans ma liste...", key="lib_search")
-        for g in [d for d in full_data if search.lower() in d['title'].lower()]:
-            # On ajoute une colonne pour le bouton Coeur
-            c1, c2, c3, c4 = st.columns([3.5, 0.5, 1, 0.5])
-            
-            c1.markdown(f"**{g['title']}**")
-            
-            # Bouton Favori (❤️ si oui, 🤍 si non)
-            heart_icon = "❤️" if g.get('fav') else "🤍"
-            if c2.button(heart_icon, key=f"fav_{g['title']}", help="Mettre en favori absolu"):
-                toggle_favorite_db(st.session_state.user_email, app_mode, g['title'], g.get('fav', False))
-                st.rerun()
-                
-            with c3:
-                new_n = st.selectbox("Note", [0,1,2,3,4,5], index=g['rating'], key=f"r_{g['title']}", label_visibility="collapsed")
-                if new_n != g['rating']:
-                    update_rating_db(st.session_state.user_email, app_mode, g['title'], new_n)
-                    st.rerun()
-            with c4:
-                if st.button("🗑️", key=f"del_{g['title']}", use_container_width=True):
-                    delete_item_db(st.session_state.user_email, app_mode, g['title'])
-                    st.rerun()
+        search_lib = st.text_input("🔍 Rechercher un titre sauvegardé...", key="lib_search_input")
+        filtered_data = [d for d in full_data if search_lib.lower() in d['title'].lower()]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        if not filtered_data:
+            st.info("Votre bibliothèque est vide ou aucun titre ne correspond à votre recherche.")
+        else:
+            # Affichage en grille de 3 colonnes
+            lib_cols = st.columns(3)
+            for idx, g in enumerate(filtered_data):
+                col_idx = idx % 3
+                with lib_cols[col_idx]:
+                    img_lib = fetch_image_turbo(g['title'], app_mode)
+                    
+                    # Carte stylisée
+                    st.markdown(f"""
+                        <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:15px; border:1px solid rgba(255,255,255,0.1); margin-bottom:10px;">
+                            <img src="{img_lib}" style="width:100%; height:180px; object-fit:cover; border-radius:10px;">
+                            <div style="font-weight:800; margin-top:10px; color:white;">{g['title']}</div>
+                            <div style="color:#3B82F6; font-size:0.8rem; font-weight:700;">{g.get('author', 'Auteur inconnu')}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Nouveau bouton de résumé IA [cite: 2026-01-04]
+                    if st.button("📝 Résumé IA", key=f"sum_{idx}_{g['title']}", use_container_width=True):
+                        with st.spinner("Analyse de l'IA..."):
+                            summary = get_ai_summary(g['title'], g.get('author', ''), app_mode)
+                            st.info(summary) # Affiche le résumé dans un petit encadré bleu
+                            
+                    # Boutons d'action sous la carte
+                    c_btn1, c_btn2, c_btn3 = st.columns([1, 2, 1])
+                    with c_btn1:
+                        heart = "❤️" if g.get('fav') else "🤍"
+                        if st.button(heart, key=f"lib_fav_{idx}_{g['title']}"):
+                            toggle_favorite_db(st.session_state.user_email, app_mode, g['title'], g.get('fav', False))
+                            st.rerun()
+                    with c_btn2:
+                        # Slider compact pour la note
+                        new_note = st.select_slider("Note", options=[0,1,2,3,4,5], value=g['rating'], key=f"lib_r_{idx}_{g['title']}", label_visibility="collapsed")
+                        if new_note != g['rating']:
+                            update_rating_db(st.session_state.user_email, app_mode, g['title'], new_note)
+                            st.rerun()
+                    with c_btn3:
+                        if st.button("🗑️", key=f"lib_del_{idx}_{g['title']}"):
+                            delete_item_db(st.session_state.user_email, app_mode, g['title'])
+                            st.rerun()
