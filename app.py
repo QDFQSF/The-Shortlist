@@ -410,38 +410,34 @@ with tab_search:
         
         prompt = f"""
         RÔLE : Tu es {role_expert}.
-        RECHERCHE ACTUELLE : "{st.session_state.last_query}"
-        FAVORIS DE L'UTILISATEUR : {favs}
-        DÉJÀ VUS/LUS (À EXCLURE) : {exclude}
-        STYLE CIBLÉ : {selected_genre}
-        RÈGLE ZÉRO (CRITIQUE) : La catégorie sélectionnée est {app_mode}. 
-        Tu as l'INTERDICTION ABSOLUE de proposer un livre si la catégorie est Jeux Vidéo. 
-        Si l'utilisateur cherche "RDR2", propose des jeux similaires (Western, Open World), jamais de romans.
+        CONTEXTE : L'utilisateur cherche "{st.session_state.last_query}".
+        FILTRES : Genre {selected_genre} | Plateforme {selected_platform}.
         
-       RÈGLES D'OR ABSOLUES :
-        1. SOUS-GENRE STRICT : Respecte l'ambiance et les codes du genre {selected_genre}.
-        2. PAS DE DOUBLONS DE FRANCHISE : Ne propose jamais deux titres de la même licence.
-        3. PAS DE SEQUELS : Ne propose pas le "Tome 2" ou un "Spin-off".
-        4. NOUVEAUTÉ : Priorise des pépites avec une ambiance identique mais d'auteurs/studios différents.
-        5. PLATEFORME : {selected_platform}.
-        6. EXCLUSIVITÉ : Propose 3 titres qui partagent la MÊME VIBE psychologique et thématique.
-        7. AMBIGUÏTÉ DE GENRE : Privilégie TOUJOURS la FICTION (notamment la Dark Romance) plutôt que les documentaires.
-        8. ANALYSE DE LA VIBE : Russian Mafia = ambiance sombre, tension et codes littéraires précis.
-        9. QUALITÉ LITTÉRAIRE : Propose des titres récents ou très populaires dans cette niche.
-        10. LANGUE : Propose UNIQUEMENT des titres disponibles en FRANÇAIS.
-        11. MARKETING : Attribue un badge court (2-3 mots max) à chaque titre parmi : "🔥 Pépite du moment", "💎 Chef-d'œuvre culte", "✨ Très rare", "📈 En tendance", "🌶️ Must-read Spicy" (si Dark Romance).
+        RÈGLES DE SÉCURITÉ CRITIQUES (ANTI-HALLUCINATION) :
+        1. VÉRITÉ ABSOLUE : Tu ne dois proposer QUE des œuvres qui existent RÉELLEMENT.
+        2. VÉRIFICATION : Si tu n'es pas sûr à 100% que le titre existe en France, NE LE PROPOSE PAS.
+        3. AUTEURS : Vérifie que l'auteur a bien écrit ce livre précis. Pas d'invention.
+        4. LANGUE : Uniquement des titres disponibles en français.
+        5. PAS DE SEQUELS : Ne propose pas le "Tome 2" ou un "Spin-off" d'un titre déjà connu ou présent dans la liste.
+        6. PAS DE DOUBLONS DE FRANCHISE : Ne propose JAMAIS deux titres de la même licence ou du même univers. (Ex: Si tu proposes un Naruto, les deux autres doivent être des mangas TOTALEMENT DIFFÉRENTS).
+        7. PLATEFORME : {selected_platform}.
         
-        FORMAT JSON : Tu dois impérativement ajouter le champ "badge" et "auteur".
+        RÈGLES DE RECOMMANDATION :
+        1. Cible : {app_mode} uniquement. (Si Jeux Vidéo : PAS DE LIVRES).
+        2. Diversité : Pas de doublons avec {exclude}. Pas deux fois la même licence.
+        3. Badge : Ajoute un badge court (ex: "Culte", "Incontournable", "Avis : 4.8/5").
         
-        RÉPONDS UNIQUEMENT AU FORMAT JSON SUIVANT :
-        [
-          {{
-            "titre": "Nom exact",
-            "auteur": "Nom de l'auteur ou du studio",
-            "badge": "Le badge choisi",
-            "desc": "Pourquoi c'est le choix parfait."
-          }}
-        ]
+        FORMAT DE RÉPONSE (JSON PUR) :
+        {{
+            "recommandations": [
+                {{
+                    "titre": "Titre exact officiel",
+                    "auteur": "Auteur exact",
+                    "badge": "Badge court",
+                    "desc": "Pourquoi ce choix en 1 phrase."
+                }}
+            ]
+        }}
         """
         
         with st.spinner('L\'IA analyse votre demande (Turbo)...'):
@@ -686,6 +682,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
