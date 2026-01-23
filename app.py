@@ -435,9 +435,8 @@ with tab_search:
                     "auteur": "Auteur exact",
                     "badge": "Badge court",
                     "desc": "Pourquoi ce choix en 1 phrase."
-                }}
-            ]
-        }}
+               }}
+        ]
         """
         
         with st.spinner('L\'IA analyse votre demande (Turbo)...'):
@@ -682,6 +681,7 @@ with tab_lib:
                             delete_item_db(st.session_state.user_email, app_mode, g['title'])
                             st.rerun()
                             
+
 
 
 
