@@ -479,7 +479,7 @@ def main():
     
             # 2. BOUCLE D'ANIMATION (Tant que l'IA n'a pas fini)
             fact_index = 0
-            loading_gif = "https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif"
+            loading_gif = "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMTZncXE1NHFyZWJiNGI2M3ZzbDZhNXlnbXR4b3hvYzk3eWt3Zjk1bSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/XRj99a68ZhhIrHReGc/giphy.gif"
             
             while not future.done():
                 # A. DÉCIDER SI C'EST UNE PROMO OU UNE ANECDOTE
@@ -736,12 +736,26 @@ def main():
                                     delete_item_db(st.session_state.user_email, app_mode, g['title'])
                                     st.rerun()
 
-# --- POINT D'ENTRÉE SÉCURISÉ (AIRBAG ANTI-CRASH) ---
+# --- POINT D'ENTRÉE SÉCURISÉ (AIRBAG V2 - DÉFIBRILLATEUR) ---
 if __name__ == "__main__":
     try:
         main()
     except Exception as e:
-        # Si une erreur survient (ex: perte de session mobile), on recharge proprement
-        print(f"Erreur 500 attrapée : {e}")
+        # Si ça plante (Erreur 500 ou coupure net), on force le navigateur à recharger
+        print(f"CRASH DÉTECTÉ : {e}")
         st.session_state.clear()
+        
+        # On injecte du JavaScript pour faire un "F5" automatique
+        html("""
+            <script>
+                console.log("Crash détecté, redémarrage forcé...");
+                window.location.reload();
+            </script>
+            <div style="text-align:center; padding:20px; color:white;">
+                ♻️ Connexion rétablie, redémarrage en cours...
+            </div>
+        """, height=200)
+        
+        # Secours Python si le JS ne part pas assez vite
+        time.sleep(1)
         st.rerun()
